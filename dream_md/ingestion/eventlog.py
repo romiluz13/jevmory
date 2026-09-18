@@ -91,6 +91,20 @@ def store_path(
     return base / ".dream-md" / "projects" / f"{project_slug(project_dir)}.db"
 
 
+def optin_path(
+    project_dir: str | os.PathLike[str], home: str | os.PathLike[str] | None = None
+) -> Path:
+    """Grading opt-in marker path (~/.dream-md/projects/<slug>.optin).
+
+    Privacy by architecture (PLAN #4): hooks only ever ingest locally;
+    grading — anything that calls the Jev API — requires this marker,
+    created by ``dream-md init --enable-grading``. No marker -> the
+    dream engine refuses to grade and candidates stay queued.
+    """
+    base = Path(home) if home is not None else Path.home()
+    return base / ".dream-md" / "projects" / f"{project_slug(project_dir)}.optin"
+
+
 @dataclass(frozen=True)
 class AppendResult:
     inserted: int

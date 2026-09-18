@@ -122,6 +122,32 @@ def active_facts(conn: sqlite3.Connection, project: str) -> list[Fact]:
     return [_row_to_fact(row) for row in rows]
 
 
+def ask_facts(conn: sqlite3.Connection, project: str) -> list[Fact]:
+    """Ask-status facts of a project, id order (expiry pass / rendering)."""
+    rows = conn.execute(
+        f"SELECT {_FACT_COLUMNS} FROM facts "
+        "WHERE project = ? AND status = ? ORDER BY id",
+        (project, STATUS_ASK),
+    ).fetchall()
+    return [_row_to_fact(row) for row in rows]
+
+
+def contradicts_partner(conn: sqlite3.Connection, fact_id: int) -> Fact | None:
+    """The fact this one contradicts (oldest ``contradicts`` link), or None.
+
+    Ask facts created by the dream engine carry exactly one such link to
+    the incumbent fact; the writer and ``resolve`` use it to render the
+    "new vs old" question and to apply resolutions.
+    """
+    row = conn.execute(
+        "SELECT related_id FROM fact_links "
+        "WHERE fact_id = ? AND relation = 'contradicts' "
+        "ORDER BY rowid LIMIT 1",
+        (fact_id,),
+    ).fetchone()
+    return get_fact(conn, row[0]) if row else None
+
+
 # --- receipts (judgments + runs) ----------------------------------------------
 
 
@@ -347,7 +373,13 @@ def retire(
 def mark_ask(
     conn: sqlite3.Connection, fact_id: int, now: str | None = None
 ) -> Fact:
-    """Low-confidence conflict verdict: fact enters the ask state (fresh count)."""
+    """Low-confidence conflict verdict: fact enters the ask state (fresh count).
+
+    The FTS row is deliberately left in place: ``mark_ask`` never
+    touches the index (M3 stance, pinned by tests) — retrieval and
+    code dedupe both filter on ``status = 'active'`` anyway, and
+    ``reactivate`` re-checks index presence rather than assuming.
+    """
     fact = get_fact(conn, fact_id)
     if fact is None:
         raise ValueError(f"no fact {fact_id}")
@@ -358,6 +390,40 @@ def mark_ask(
             "WHERE id = ?",
             (STATUS_ASK, timestamp, fact_id),
         )
+    updated = get_fact(conn, fact_id)
+    assert updated is not None
+    return updated
+
+
+def reactivate(
+    conn: sqlite3.Connection, fact_id: int, now: str | None = None
+) -> Fact:
+    """Set a fact back to ACTIVE and make sure its FTS row exists.
+
+    The ``keep-new`` resolution of an ask: the challenger becomes the
+    active truth. Index presence is checked, not assumed — ``mark_ask``
+    leaves the FTS row in place, so a fact that went ask->reactivate
+    may still be indexed (insert would collide) or not (if it passed
+    through retire on another path).
+    """
+    fact = get_fact(conn, fact_id)
+    if fact is None:
+        raise ValueError(f"no fact {fact_id}")
+    timestamp = now or _utc_now()
+    with conn:
+        conn.execute(
+            "UPDATE facts SET status = ?, ask_seen_count = 0, updated_at = ? "
+            "WHERE id = ?",
+            (STATUS_ACTIVE, timestamp, fact_id),
+        )
+        indexed = conn.execute(
+            "SELECT 1 FROM facts_fts WHERE rowid = ?", (fact_id,)
+        ).fetchone()
+        if not indexed:
+            conn.execute(
+                "INSERT INTO facts_fts (rowid, claim) VALUES (?, ?)",
+                (fact_id, fact.claim),
+            )
     updated = get_fact(conn, fact_id)
     assert updated is not None
     return updated

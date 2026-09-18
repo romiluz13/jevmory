@@ -34,6 +34,10 @@ DURABLE_GATE_USER = 0.7  # user statements are decisions
 DURABLE_GATE_ASSISTANT = 0.8  # assistant statements are narration
 NEAR_MISS_LOW = 0.5  # near-miss band [0.5, gate) is surfaced in status, never silent
 SIGNIFICANCE_GATE = 1.0  # Score levels: 0 trivial -> 3 critical
+# Phase B pairing bar (PLAN Phase B #3): only candidates with significance
+# >= 2 are paired against remembered facts (contradiction questions are the
+# v1 cost cap); below it survivors add directly, no pair questions spent.
+PAIR_SIGNIFICANCE_GATE = 2
 SAME_CLAIM_GATE = 0.8  # >= -> duplicate: bump support_count, add source event id
 CONTRADICTION_GATE = 0.6  # >= -> conflict pair goes to Phase B questions
 SUPERSEDE_CONFIDENCE = 0.8  # destructive verdicts need high confidence (DOMAIN #3)
@@ -68,13 +72,16 @@ AUDIT_EVIDENCE_STATEMENTS = 40
 # the review band — surfaced, never silent (same stance as near-misses).
 AUDIT_DISPOSITION_GATE = 0.6
 
-# --- First-dream cost bound (M5 TODO, review R10) -----------------------------
+# --- First-dream cost bound (M5, review R10) -----------------------------------
 
-# TODO(M5): per-dream candidate cap + user-role-first ordering to bound the
-# first `dream` cost on long-lived projects. Context: review measured 981
-# candidates from just 26 machine-wide transcripts, 88% assistant-role; a
-# user's first dream on a long-lived project is the budget spike. None means
-# uncapped until M5 tunes it against the ~40-request smoke budget cap.
+# Per-dream candidate cap + user-role-first event ordering (both shipped in
+# M5's engine) bound the first `dream` cost on long-lived projects. Context:
+# review measured 981 candidates from just 26 machine-wide transcripts, 88%
+# assistant-role; a user's first dream on a long-lived project is the budget
+# spike. The cap counts candidate GROUPS (deduped by normalized text + role);
+# events left beyond it stay pending (graded next dream, counted in stats as
+# events_deferred). None means uncapped; the value is tuned at the live smoke
+# run against the ~40-request budget cap, not guessed in advance.
 MAX_CANDIDATES_PER_DREAM: int | None = None
 
 
