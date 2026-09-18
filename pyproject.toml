@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dream-md"
+version = "0.1.0"
+description = "Coding-agent memory where every fact is a verbatim quote graded by calibrated confidence."
+license = { text = "MIT" }
+requires-python = ">=3.10"
+# Runtime dependencies: none, ever. Python 3 stdlib only (mission decision);
+# setuptools above is build-time only, used for the console entry point.
+
+[project.scripts]
+dream-md = "dream_md.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dream_md*"]
