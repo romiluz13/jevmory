@@ -57,6 +57,17 @@ RETRY_BACKOFF_SECONDS = (1.0, 2.0, 4.0)  # sleep before retry k is schedule[k-1]
 RETRY_JITTER_MAX = 0.25  # uniform jitter added to each backoff sleep
 REQUEST_TIMEOUT_SECONDS = 30.0  # per Jev HTTP request
 
+# --- Audit (M4, Phase C) ------------------------------------------------------
+
+# Evidence pool sent with every audit request: the N most recent active
+# facts and the N most recently ingested statements (redacted at rest).
+AUDIT_EVIDENCE_FACTS = 30
+AUDIT_EVIDENCE_STATEMENTS = 40
+# A disposition (keep|stale|wrong|unsupported) is DECISIVE only when the
+# choice answer's confidence clears this gate; below it the line lands in
+# the review band — surfaced, never silent (same stance as near-misses).
+AUDIT_DISPOSITION_GATE = 0.6
+
 # --- First-dream cost bound (M5 TODO, review R10) -----------------------------
 
 # TODO(M5): per-dream candidate cap + user-role-first ordering to bound the
