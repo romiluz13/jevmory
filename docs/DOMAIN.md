@@ -9,11 +9,11 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 |---|---|
 | **Session** | One recorded coding-agent conversation (Claude Code or Codex transcript, JSONL on disk). |
 | **Event** | One line of a session transcript, immutable, with a stable id (`sha256(file)+line`). |
-| **Statement** | A verbatim text quote extracted from an event. Never rewritten, never generated. |
+| **Statement** | A verbatim text quote extracted from an event. Never rewritten, never generated. "Verbatim" means modulo outer whitespace (leading/trailing trim); the interior is byte-exact. |
 | **Candidate** | A Statement that might deserve to become a Fact. Deterministically extracted, then judged. |
-| **Fact** | An active, graded Statement in the memory store: verbatim claim + category + significance + confidence + provenance (source event ids) + lifecycle status. |
-| **Judgment** | One typed Jev answer (Noul / Choice / Score) about a state. Judgments are evidence, recorded in the run log. |
-| **Confidence** | 0..1 certainty from Jev's probability distribution (Choice/Score) or the Noul value's distance from 0.5. |
+| **Fact** | An active, graded Statement in the memory store: verbatim claim + verbatim context (surrounding exchanges) + category + significance + confidence + provenance (source event ids) + lifecycle status. |
+| **Judgment** | One typed Jev answer (Noul / Choice / Score) about a state. Judgments are evidence, stored verbatim in the judgments table — every number in dream.md is reproducible from stored receipts. |
+| **Confidence** | A Fact's confidence is exactly `clamp01(2·|durable_noul − 0.5|)` — the certainty of durability. Choice/Score confidences drive their own rules and are never blended in. One formula, in `thresholds.py`. |
 | **Significance** | How much the Fact matters for future work in this project (Score levels trivial→critical). |
 | **Receipt** | The provenance + confidence record attached to every Fact: "who said it, when, how sure are we." |
 | **Dream** | A consolidation run: grade pending candidates, dedupe against existing Facts, resolve conflicts, retire stale Facts, rewrite `dream.md`. |
@@ -32,11 +32,20 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 3. **Destructive verdicts need high confidence.** Retiring/superseding a Fact requires
    confidence ≥ 0.8; low-confidence cases get Verdict `ask` and are surfaced in a
    "questions for you" section of dream.md.
-4. **Hooks never break sessions.** Ingest is async, time-boxed, offline-tolerant:
-   if the Jev API is unreachable, candidates queue as ungraded Events and wait for
-   the next Dream.
+4. **Hooks never break sessions, never grade, never die silently.** Ingest is
+   synchronous, local-only, wrapped so it always exits 0; failures log where
+   `status` shows them. Grading is never in the hook path.
 5. **Per-project isolation.** Each project directory gets its own SQLite store;
    Facts never cross projects.
+6. **Redaction at rest.** Secrets are scrubbed deterministically at ingest, before
+   storage — the local store never holds raw secrets, and nothing unredacted can
+   ever leave the machine.
+7. **Grading is opt-in per project.** A marker file created by `dream-md init
+   --enable-grading` is the only trigger for anything that calls the Jev API.
+   No marker → events queue locally, forever if need be.
+8. **No decay in v1.** Absence of mention is not evidence of staleness: confidence
+   never decays, staleness is a visual badge, and only contradiction evidence
+   changes a Fact's status.
 
 ## Sub-domain modules (one context, five modules)
 

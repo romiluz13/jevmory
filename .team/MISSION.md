@@ -11,7 +11,7 @@ confidence. Target: jev.directory submission-quality demo by morning.
 PASS requires ALL of:
 1. `python3 -m unittest discover` green with no network and no API key.
 2. Live smoke: real Jev API call via `TYPESAFE_API_KEY` returns typed answers (3+ candidates graded).
-3. Real `dream.md` file generated from real transcripts on this machine, containing graded verbatim facts with receipts.
+3. Real `dream.md` file generated from real transcripts on this machine, containing graded verbatim facts with receipts. (Adjudicated with Kimi F9-nit: this real-transcript dream run is part of the smoke budget — capped at ~40 API requests, usage logged in `runs.stats`.)
 4. `dream-md audit` produces a graded report on a real or realistic MEMORY.md.
 5. README with pitch, quickstart, privacy note, demo section. MIT LICENSE.
 6. All work committed to git on `main` with clean history.

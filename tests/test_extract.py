@@ -1,168 +1,309 @@
-"""Deterministic candidate extraction tests: chunking, dedupe, provenance."""
+"""Extraction tests: sentence chunking, anaphoric drop, context, no dedupe."""
 
 from __future__ import annotations
 
-import hashlib
+import tempfile
 import unittest
 from pathlib import Path
 
 from dream_md.ingestion.claude import parse_claude_transcript
-from dream_md.ingestion.codex import parse_codex_transcript
-from dream_md.ingestion.eventlog import event_id
+from dream_md.ingestion.eventlog import EventLog, event_id
 from dream_md.ingestion.extract import (
-    MIN_CANDIDATE_CHARS,
+    candidates_from_statements,
     chunk_text,
     extract_candidates,
 )
 from dream_md.ingestion.models import ParsedTranscript, Statement
+from dream_md.ingestion.redact import redact
+from dream_md.thresholds import (
+    CHUNK_MAX_CHARS,
+    CONTEXT_MAX_CHARS,
+    MIN_CANDIDATE_CHARS,
+)
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+CLAUDE_SID = "00000000-0000-4000-8000-0000000000c1"
 
 
-def _statement(line_no, index, role, text):
-    return Statement(
-        line_no=line_no,
-        index=index,
-        ts="2026-09-19T00:00:00Z",
-        role=role,
-        text=text,
-        session_id="sess-1",
+def make_transcript(statements, session_id="s1", source="claude", path="t.jsonl"):
+    return ParsedTranscript(
+        path=path,
+        source=source,
+        session_id=session_id,
+        cwd=None,
+        statements=tuple(statements),
     )
 
 
-def _parsed(path, *statements):
-    return ParsedTranscript(
-        path=path,
-        source="claude",
-        session_id="sess-1",
-        cwd=None,
-        statements=statements,
+def user_statement(text, session_id="s1", line_no=1, index=0, ts=None):
+    return Statement(
+        line_no=line_no, index=index, ts=ts, role="user", text=text,
+        session_id=session_id,
     )
 
 
 class ChunkTextTest(unittest.TestCase):
     def test_short_text_is_single_chunk(self):
-        self.assertEqual(chunk_text("always use bun here"), ["always use bun here"])
+        self.assertEqual(chunk_text("One. Two. Three."), ["One. Two. Three."])
+
+    def test_two_long_sentences_split_at_sentence_boundary(self):
+        first = "A" * 350 + "."
+        second = "B" * 350 + "."
+        self.assertEqual(chunk_text(f"{first} {second}"), [first, second])
+
+    def test_single_chunk_at_cap_is_not_split(self):
+        self.assertEqual(chunk_text("x" * 600), ["x" * 600])
+
+    def test_oversize_sentence_hard_split(self):
+        self.assertEqual(chunk_text("x" * 700), ["x" * 600, "x" * 100])
+
+    def test_hard_split_prefers_whitespace_boundary(self):
+        # 699 chars, no sentence punctuation: one span, split at spaces.
+        text = ("word " * 140).strip()
+        chunks = chunk_text(text)
+        self.assertEqual(len(chunks), 2)
+        self.assertLessEqual(len(chunks[0]), 600)
+        self.assertTrue(chunks[0].endswith("word"))  # no partial word
+        self.assertTrue(chunks[1].startswith("word"))
+        self.assertEqual(" ".join(chunks), " ".join(text.split()))
 
     def test_empty_and_whitespace_only(self):
         self.assertEqual(chunk_text(""), [])
-        self.assertEqual(chunk_text("   \n  "), [])
+        self.assertEqual(chunk_text("   \n\t "), [])
 
-    def test_text_at_exact_limit_unchanged(self):
-        text = "a" * 600
-        self.assertEqual(chunk_text(text), [text])
-
-    def test_breaks_at_whitespace_within_limit(self):
-        text = " ".join(["word"] * 200)  # 999 chars
-        chunks = chunk_text(text)
-        self.assertGreater(len(chunks), 1)
-        for chunk in chunks:
-            self.assertLessEqual(len(chunk), 600)
-            self.assertIn(chunk, text)  # verbatim substrings only
-        normalize = lambda s: " ".join(s.split())
-        self.assertEqual(normalize(" ".join(chunks)), normalize(text))
-
-    def test_hard_cut_when_no_whitespace(self):
-        self.assertEqual(chunk_text("a" * 601), ["a" * 600, "a"])
-
-    def test_newline_boundary_preferred_over_hard_cut(self):
-        text = "x" * 595 + "\n" + "y" * 10
-        self.assertEqual(chunk_text(text), ["x" * 595, "y" * 10])
-
-    def test_bad_limit_raises(self):
+    def test_zero_max_chars_raises(self):
         with self.assertRaises(ValueError):
-            chunk_text("text", limit=0)
+            chunk_text("anything", max_chars=0)
+
+    def test_chunks_join_back_to_normalized_text(self):
+        text = (
+            "First convention. " * 30
+            + "A much longer final convention sentence that goes on and on "
+            "about uv run and docker compose and conventional commits."
+        )
+        chunks = chunk_text(text)
+        self.assertEqual(" ".join(chunks), " ".join(text.split()))
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk), CHUNK_MAX_CHARS)
+
+    def test_chunks_are_substrings_of_stripped_text(self):
+        text = "Alpha beta gamma. Delta epsilon. Zeta."
+        for chunk in chunk_text(text):
+            self.assertIn(chunk, text.strip())
 
 
-class ExtractCandidatesTest(unittest.TestCase):
+class AnaphoricDropTest(unittest.TestCase):
+    def _extract(self, *texts):
+        return extract_candidates(
+            make_transcript([user_statement(text) for text in texts])
+        )
+
+    def test_anaphoric_starts_dropped(self):
+        for text in (
+            "That is the convention here.",
+            "This is how we deploy.",
+            "It must never use npm, use bun instead.",
+            "They always fail like that.",
+            "The same rule applies to staging.",
+            "Those logs are irrelevant.",
+        ):
+            self.assertEqual(self._extract(text), [], text)
+
+    def test_anaphoric_drop_is_case_insensitive(self):
+        self.assertEqual(self._extract("that is the rule here."), [])
+
+    def test_non_anaphoric_statements_kept(self):
+        candidates = self._extract(
+            "Never commit secrets to the repo.",
+            "The repo standardizes on uv.",
+            "Use it carefully, the tool is sharp.",
+        )
+        self.assertEqual(len(candidates), 3)
+
+    def test_first_chunk_is_not_exempt(self):
+        # Pinned PLAN v2 stance: the drop applies to ALL chunks including
+        # a statement's first. If the lead wants first-chunk exemption,
+        # it is a one-line change in extract.py.
+        self.assertEqual(self._extract("It must never use npm, use bun instead."), [])
+
+    def test_anaphoric_second_chunk_dropped_first_kept(self):
+        candidates = self._extract(
+            "Use bun for all scripts. That said, keep node for the build step."
+        )
+        self.assertEqual(len(candidates), 1)
+        self.assertTrue(candidates[0].text.startswith("Use bun"))
+
+
+class ContextTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.claude = parse_claude_transcript(FIXTURES / "claude_session.jsonl")
-        cls.codex = parse_codex_transcript(FIXTURES / "codex_session.jsonl")
+        cls.parsed = parse_claude_transcript(FIXTURES / "claude_session.jsonl")
+        cls.candidates = extract_candidates(cls.parsed)
 
-    def test_roles_preserved(self):
-        candidates = extract_candidates(self.claude, self.codex)
-        roles = {c.role for c in candidates}
-        self.assertEqual(roles, {"user", "assistant"})
+    def test_first_statement_has_empty_context(self):
+        self.assertEqual(self.candidates[0].context, "")
 
-    def test_all_candidates_within_limit(self):
-        candidates = extract_candidates(self.claude, self.codex)
-        self.assertGreater(len(candidates), 0)
-        for candidate in candidates:
-            self.assertLessEqual(len(candidate.text), 600)
+    def test_single_preceding_turn_context(self):
+        expected = f"[user] {self.parsed.statements[0].text}"
+        self.assertEqual(self.candidates[1].context, expected)
+
+    def test_two_preceding_turns_context(self):
+        expected = (
+            f"[user] {self.parsed.statements[0].text}"
+            f"\n\n[assistant] {self.parsed.statements[1].text}"
+        )
+        self.assertEqual(self.candidates[2].context, expected)
+
+    def test_context_uses_last_two_turns_only(self):
+        # With 4 preceding statements available, context keeps only the
+        # last two (the secrets candidate: dispatch + conventions).
+        context = self.candidates[5].context
+        self.assertIn("You are dispatched", context)
+        self.assertIn("Repo conventions", context)
+        self.assertNotIn("Always use uv run", context)
+
+    def test_chunks_of_one_statement_share_context(self):
+        self.assertEqual(self.candidates[3].context, self.candidates[4].context)
+
+    def test_context_truncated_to_cap_at_word_boundary(self):
+        context = self.candidates[5].context
+        self.assertLessEqual(len(context), CONTEXT_MAX_CHARS)
+        self.assertTrue(context.startswith("[user] You are dispatched"))
+        self.assertEqual(context, context.rstrip())  # cut at whitespace, not mid-word
+        self.assertTrue(context[-1].isalpha() or context[-1] in ".!?")
+
+    def test_context_is_redacted(self):
+        candidates = extract_candidates(
+            make_transcript(
+                [
+                    user_statement("the password=changeme12345 is shared"),
+                    user_statement("Rotate it weekly."),
+                ]
+            )
+        )
+        self.assertIn("[redacted:credential]", candidates[1].context)
+        self.assertNotIn("changeme12345", candidates[1].context)
+
+    def test_context_never_crosses_sessions(self):
+        statements = [
+            user_statement("Session A turn.", session_id="a"),
+            user_statement("Session B turn.", session_id="b"),
+        ]
+        candidates = candidates_from_statements(statements)
+        by_session = {c.session_id: c for c in candidates}
+        self.assertEqual(by_session["b"].context, "")
+        self.assertEqual(by_session["a"].context, "")
+
+
+class FixtureExtractionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.parsed = parse_claude_transcript(FIXTURES / "claude_session.jsonl")
+        cls.candidates = extract_candidates(cls.parsed)
+
+    def test_candidate_count_and_roles(self):
+        # 5 statements; the 823-char conventions statement yields 2 chunks.
+        self.assertEqual(len(self.candidates), 6)
+        self.assertEqual(
+            [c.role for c in self.candidates],
+            ["user", "assistant", "user", "user", "user", "user"],
+        )
+
+    def test_all_chunks_within_cap(self):
+        for candidate in self.candidates:
+            self.assertLessEqual(len(candidate.text), CHUNK_MAX_CHARS)
             self.assertGreaterEqual(len(candidate.text), MIN_CANDIDATE_CHARS)
 
-    def test_long_prompt_chunked_into_multiple_candidates(self):
-        long_statement = self.claude.statements[3]
-        self.assertGreater(len(long_statement.text), 600)
-        long_chunks = [
-            c for c in extract_candidates(self.claude)
-            if c.text in long_statement.text
-        ]
-        self.assertGreater(len(long_chunks), 1)
-        for candidate in long_chunks:
-            self.assertLessEqual(len(candidate.text), 600)
-            self.assertIn(candidate.text, long_statement.text)  # verbatim
-
-    def test_min_length_floor_drops_filler(self):
-        parsed = _parsed(
-            "/tmp/t1.jsonl",
-            _statement(1, 0, "user", "ok"),  # 2 chars, observed real prompt
-            _statement(2, 0, "user", "keep going"),  # 10 chars, observed
-            _statement(3, 0, "user", "please use bun not npm in here"),  # kept
-        )
-        candidates = extract_candidates(parsed)
-        self.assertEqual([c.text for c in candidates], ["please use bun not npm in here"])
-
-    def test_dedupe_by_content_hash_first_occurrence_wins(self):
-        text = "always run the linter before every commit in this repo"
-        parsed = _parsed(
-            "/tmp/t2.jsonl",
-            _statement(1, 0, "user", text),
-            _statement(5, 0, "assistant", text),  # same content again
-        )
-        candidates = extract_candidates(parsed)
-        self.assertEqual(len(candidates), 1)
-        self.assertEqual(candidates[0].event_id, event_id("/tmp/t2.jsonl", 1, 0))
-        self.assertEqual(candidates[0].role, "user")  # first occurrence
-
-    def test_dedupe_across_transcripts(self):
-        text = "the staging cluster is off limits for load testing"
-        first = _parsed("/tmp/a.jsonl", _statement(1, 0, "user", text))
-        second = _parsed("/tmp/b.jsonl", _statement(1, 0, "user", text))
-        candidates = extract_candidates(first, second)
-        self.assertEqual(len(candidates), 1)
-        self.assertEqual(candidates[0].event_id, event_id("/tmp/a.jsonl", 1, 0))
-
-    def test_content_hash_is_sha256_of_text(self):
-        parsed = _parsed("/tmp/c.jsonl", _statement(1, 0, "user", "hash me please, i am a statement"))
-        candidate = extract_candidates(parsed)[0]
+    def test_long_statement_yields_two_chunks(self):
+        statement = self.parsed.statements[3]  # line 10, 823 chars
+        chunks = [c for c in self.candidates if c.ts == statement.ts]
+        self.assertEqual([len(c.text) for c in chunks], [573, 249])
         self.assertEqual(
-            candidate.content_hash,
-            hashlib.sha256(candidate.text.encode("utf-8")).hexdigest(),
+            " ".join(c.text for c in chunks),
+            " ".join(redact(statement.text).split()),
         )
 
-    def test_multi_statement_line_gets_distinct_event_ids(self):
-        parsed = _parsed(
-            "/tmp/d.jsonl",
-            _statement(4, 0, "assistant", "first text block of the message"),
-            _statement(4, 1, "assistant", "second text block of the message"),
-        )
-        candidates = extract_candidates(parsed)
-        self.assertEqual(len(candidates), 2)
-        self.assertNotEqual(candidates[0].event_id, candidates[1].event_id)
-        self.assertNotEqual(event_id("/tmp/d.jsonl", 4, 0), event_id("/tmp/d.jsonl", 4, 1))
+    def test_secrets_candidate_is_redacted(self):
+        candidate = self.candidates[5]
+        self.assertIn("[redacted:credential]", candidate.text)
+        self.assertNotIn("changeme12345", candidate.text)
+
+    def test_event_ids_match_stored_events(self):
+        # Integration: extraction ids are exactly the event ids the store
+        # holds (chunks of one statement share its event id).
+        with tempfile.TemporaryDirectory() as tmp:
+            with EventLog(Path(tmp) / "store.db", project="slug12345678") as log:
+                log.append(self.parsed)
+                row_ids = {
+                    row[0] for row in log._conn.execute("SELECT id FROM events")
+                }
+        candidate_ids = {c.event_id for c in self.candidates}
+        self.assertEqual(candidate_ids, row_ids)  # 5 unique ids, 6 candidates
+        for candidate in self.candidates:
+            self.assertIn(candidate.event_id, row_ids)
 
     def test_ts_and_session_propagated(self):
-        candidate = extract_candidates(self.claude)[0]
-        self.assertEqual(candidate.ts, "2026-09-01T19:41:02.101Z")
-        self.assertEqual(candidate.session_id, "f617f58f-40f9-4a35-9d77-69bb271400b2")
+        for candidate in self.candidates:
+            self.assertEqual(candidate.session_id, CLAUDE_SID)
+        self.assertEqual(
+            [c.ts for c in self.candidates],
+            [s.ts for s in self.parsed.statements for _ in range(
+                2 if s.line_no == 10 else 1
+            )],
+        )
 
     def test_extraction_is_deterministic(self):
-        self.assertEqual(
-            extract_candidates(self.claude, self.codex),
-            extract_candidates(self.claude, self.codex),
+        again = extract_candidates(self.parsed)
+        self.assertEqual(again, self.candidates)
+
+
+class NoDedupeTest(unittest.TestCase):
+    def test_cross_session_repeats_both_survive(self):
+        # R2 downstream contract: no content dedupe at extraction. M3's
+        # memory-level dedupe (hash + Jaccard) bumps support_count on
+        # these repeats instead of never seeing them.
+        text = "Always run the linter before pushing."
+        candidates = extract_candidates(
+            make_transcript([user_statement(text, "s1")]),
+            make_transcript([user_statement(text, "s2")]),
         )
+        self.assertEqual(len(candidates), 2)
+        self.assertNotEqual(candidates[0].event_id, candidates[1].event_id)
+        self.assertEqual(candidates[0].text, candidates[1].text)
+
+    def test_same_session_repeat_yields_two_candidates_one_event(self):
+        # Extraction keeps every occurrence; storage collapses the event.
+        text = "Always run the linter before pushing."
+        candidates = extract_candidates(
+            make_transcript(
+                [user_statement(text, "s1"), user_statement(text, "s1")]
+            )
+        )
+        self.assertEqual(len(candidates), 2)
+        self.assertEqual(candidates[0].event_id, candidates[1].event_id)
+
+
+class StatementsVariantTest(unittest.TestCase):
+    def test_candidates_from_statements_matches_extract(self):
+        parsed = parse_claude_transcript(FIXTURES / "claude_session.jsonl")
+        self.assertEqual(
+            candidates_from_statements(parsed.statements),
+            extract_candidates(parsed),
+        )
+
+    def test_groups_by_session_with_per_session_context(self):
+        statements = [
+            user_statement("Session A turn one.", session_id="a"),
+            user_statement("Session A turn two.", session_id="a"),
+            user_statement("Session B turn one.", session_id="b"),
+        ]
+        candidates = candidates_from_statements(statements)
+        self.assertEqual(
+            [c.session_id for c in candidates], ["a", "a", "b"]
+        )
+        by_session = {c.session_id: c for c in candidates}
+        self.assertEqual(by_session["b"].context, "")
+        self.assertIn("Session A turn one.", by_session["a"].context)
 
 
 if __name__ == "__main__":

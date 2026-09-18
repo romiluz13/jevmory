@@ -2,7 +2,9 @@
 
 The fixture is a sanitized excerpt rebuilt from REAL rollout files
 observed on 2026-09-19 under ~/.codex/sessions/ (field shapes exact,
-text content replaced with benign equivalents — no secrets).
+text content replaced with benign equivalents — no secrets). Sanitized
+per review R3: home paths -> /Users/dev/example, synthetic session
+UUIDs (1111... pattern).
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from pathlib import Path
 from dream_md.ingestion.codex import parse_codex_transcript
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "codex_session.jsonl"
+SESSION_ID = "11111111-0000-4000-8000-0000000000d1"
 
 
 class CodexParserTest(unittest.TestCase):
@@ -25,10 +28,8 @@ class CodexParserTest(unittest.TestCase):
         # never the file name (filename uuid != session_id in 457/1077
         # real files, subagent threads).
         self.assertEqual(self.parsed.source, "codex")
-        self.assertEqual(
-            self.parsed.session_id, "019e3a47-561e-73a0-9f5e-fa10a3c6deec"
-        )
-        self.assertEqual(self.parsed.cwd, "/Users/rom.iluz/Dev/example")
+        self.assertEqual(self.parsed.session_id, SESSION_ID)
+        self.assertEqual(self.parsed.cwd, "/Users/dev/example")
 
     def test_statements_come_from_message_payloads_only(self):
         # fixture lines: 4 user prompt, 7 assistant output_text,
@@ -40,9 +41,7 @@ class CodexParserTest(unittest.TestCase):
         self.assertEqual(statement.role, "user")
         self.assertEqual(statement.index, 0)
         self.assertEqual(statement.ts, "2026-05-18T08:51:01.000Z")
-        self.assertEqual(
-            statement.session_id, "019e3a47-561e-73a0-9f5e-fa10a3c6deec"
-        )
+        self.assertEqual(statement.session_id, SESSION_ID)
         self.assertEqual(
             statement.text,
             "Run the integration tests with DATABASE_URL pointing at the "
