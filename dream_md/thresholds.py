@@ -50,7 +50,12 @@ JACCARD_GATE = 0.6  # code-level dedupe: normalized-hash equal OR Jaccard >= 0.6
 
 CHARS_PER_TOKEN = 4  # estimator: chars / 4
 BATCH_TOKEN_BUDGET = 28_000  # per-request cap (~112k chars of state + questions)
-RETRY_MAX_ATTEMPTS = 3  # 429/529: 1s/2s/4s + jitter, then give up gracefully
+RETRY_MAX_ATTEMPTS = 3  # 429/529: backoff schedule + jitter, then give up gracefully
+RETRY_BACKOFF_SECONDS = (1.0, 2.0, 4.0)  # sleep before retry k is schedule[k-1]
+# (3 total attempts => the 1s and 2s sleeps are taken; the 4s term is the
+# schedule's tail if attempts are ever raised — truncated, never exceeded)
+RETRY_JITTER_MAX = 0.25  # uniform jitter added to each backoff sleep
+REQUEST_TIMEOUT_SECONDS = 30.0  # per Jev HTTP request
 
 # --- First-dream cost bound (M5 TODO, review R10) -----------------------------
 
