@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_DIR = REPO_ROOT / "jev_md"
+PACKAGE_DIR = REPO_ROOT / "jevmory"
 
 try:
     import tomllib
@@ -27,17 +27,17 @@ class TestPackaging(unittest.TestCase):
             (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         )
         project = data["project"]
-        self.assertEqual(project["name"], "jev-md")
+        self.assertEqual(project["name"], "jevmory")
         self.assertEqual(project["version"], "0.1.0")
         self.assertEqual(
-            project["scripts"]["jev-md"], "jev_md.cli:main"
+            project["scripts"]["jevmory"], "jevmory.cli:main"
         )
         # Zero runtime dependencies is a mission invariant.
         self.assertEqual(project.get("dependencies", []), [])
 
     def test_stdlib_only(self):
-        """Every import under jev_md/ must be stdlib or the package itself."""
-        allowed = set(sys.stdlib_module_names) | {"jev_md"}
+        """Every import under jevmory/ must be stdlib or the package itself."""
+        allowed = set(sys.stdlib_module_names) | {"jevmory"}
         offenders = []
         for py in sorted(PACKAGE_DIR.rglob("*.py")):
             tree = ast.parse(
@@ -62,8 +62,8 @@ class TestPackaging(unittest.TestCase):
 
 class TestCli(unittest.TestCase):
     def test_version_flag(self):
-        from jev_md import __version__
-        from jev_md.cli import main
+        from jevmory import __version__
+        from jevmory.cli import main
 
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
@@ -73,13 +73,13 @@ class TestCli(unittest.TestCase):
         self.assertIn(__version__, buf.getvalue())
 
     def test_no_args_prints_help_and_returns_zero(self):
-        from jev_md.cli import main
+        from jevmory.cli import main
 
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             rc = main([])
         self.assertEqual(rc, 0)
-        self.assertIn("jev-md", buf.getvalue())
+        self.assertIn("jevmory", buf.getvalue())
 
 
 if __name__ == "__main__":

@@ -10,16 +10,16 @@ from __future__ import annotations
 
 import unittest
 
-from jev_md.judgment.client import Usage
-from jev_md.judgment.errors import JevAuthError, JevProtocolError, JevRetryExhausted
-from jev_md.judgment.fake import FakeJev
-from jev_md.judgment.questions import (
+from jevmory.judgment.client import Usage
+from jevmory.judgment.errors import JevAuthError, JevProtocolError, JevRetryExhausted
+from jevmory.judgment.fake import FakeJev
+from jevmory.judgment.questions import (
     phase_a_questions,
     phase_a_state,
     phase_b_pair_questions,
 )
-from jev_md.ingestion.extract import Candidate
-from jev_md.thresholds import (
+from jevmory.ingestion.extract import Candidate
+from jevmory.thresholds import (
     CONTRADICTION_GATE,
     DURABLE_GATE_USER,
     SAME_CLAIM_GATE,

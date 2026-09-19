@@ -6,15 +6,15 @@ from __future__ import annotations
 import json
 import unittest
 
-from jev_md.audit.memfile import MemoryLine
-from jev_md.audit.report import (
+from jevmory.audit.memfile import MemoryLine
+from jevmory.audit.report import (
     AuditReport,
     build_report,
     render_json,
     render_md,
     render_terminal,
 )
-from jev_md.audit.rules import REVIEW, LineVerdict
+from jevmory.audit.rules import REVIEW, LineVerdict
 
 
 def keep(number, text="holds up fine", section=None):
@@ -105,7 +105,7 @@ class RenderTerminalTest(unittest.TestCase):
         ]
         out = render_terminal(report(verdicts))
         lines = out.splitlines()
-        self.assertEqual(lines[0], "jev-md audit — MEMORY.md")
+        self.assertEqual(lines[0], "jevmory audit — MEMORY.md")
         self.assertTrue(lines[3].startswith("LINE"))
         # pinned layout: number 0:4, verdict 6:17, conf 19:23,
         # supp 25:29, contra 31:37, claim 39:
@@ -153,7 +153,7 @@ class RenderMdTest(unittest.TestCase):
             problem(7, "stale", text="we use Postgres in staging"),
         ]
         out = render_md(report(verdicts))
-        self.assertIn("# jev-md audit — MEMORY.md", out)
+        self.assertIn("# jevmory audit — MEMORY.md", out)
         self.assertIn(
             "| line | section | verdict | confidence | supported "
             "| contradicted | claim |",

@@ -6,11 +6,11 @@ so the numbers are comparable across commits and across machines that
 share the corpus. Reads only; writes nothing; no network, no API key.
 
 The corpus list lives OUTSIDE this repo — real transcript paths are
-machine-local and private. Point JEV_MD_SMOKE_CORPUS at a text file with
+machine-local and private. Point JEVMORY_SMOKE_CORPUS at a text file with
 one `<path> <parser>` pair per line (`#` comments and blank lines
 ignored, `~` expanded):
 
-    JEV_MD_SMOKE_CORPUS=~/.jev-md/smoke-corpus.txt python3 scripts/corpus_smoke.py
+    JEVMORY_SMOKE_CORPUS=~/.jevmory/smoke-corpus.txt python3 scripts/corpus_smoke.py
 
 Pinning the same file keeps runs comparable; the env indirection keeps
 personal paths out of the repo and lets each machine pin its own corpus.
@@ -33,13 +33,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from jev_md.ingestion.claude import parse_claude_transcript
-from jev_md.ingestion.codex import parse_codex_transcript
-from jev_md.ingestion.extract import extract_candidates
-from jev_md.ingestion.redact import redactions_in
-from jev_md.thresholds import CHUNK_MAX_CHARS, CONTEXT_MAX_CHARS, MIN_CANDIDATE_CHARS
+from jevmory.ingestion.claude import parse_claude_transcript
+from jevmory.ingestion.codex import parse_codex_transcript
+from jevmory.ingestion.extract import extract_candidates
+from jevmory.ingestion.redact import redactions_in
+from jevmory.thresholds import CHUNK_MAX_CHARS, CONTEXT_MAX_CHARS, MIN_CANDIDATE_CHARS
 
-CORPUS_ENV = "JEV_MD_SMOKE_CORPUS"
+CORPUS_ENV = "JEVMORY_SMOKE_CORPUS"
 
 
 def load_pinned() -> tuple[tuple[str, str], ...]:
@@ -49,7 +49,7 @@ def load_pinned() -> tuple[tuple[str, str], ...]:
         print(f"error: {CORPUS_ENV} is not set")
         print(f"       write a corpus list file (one '<path> <parser>' per line,")
         print("       '#' comments ignored) and point the env var at it, e.g.:")
-        print(f"       export {CORPUS_ENV}=~/.jev-md/smoke-corpus.txt")
+        print(f"       export {CORPUS_ENV}=~/.jevmory/smoke-corpus.txt")
         return ()
     file = Path(os.path.expanduser(list_path))
     if not file.exists():

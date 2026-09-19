@@ -12,7 +12,7 @@ point is to prove auth, endpoint, envelope parsing, and usage
 accounting against the live API, cheaply).
 
 ``--dream`` — ONE real dream run on a project's real store, exactly
-like ``jev-md dream``: requires the grading opt-in marker AND the
+like ``jevmory dream``: requires the grading opt-in marker AND the
 key, both checked BEFORE any request. Usage lands in the store's
 ``runs.stats`` receipts like every dream. Budget: ``--cap`` API
 requests (default 40, PLAN's smoke ceiling); the cap is enforced by
@@ -41,22 +41,22 @@ _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from jev_md.dream.engine import DreamReport, GradingNotEnabledError, run_dream
-from jev_md.dream.writer import (
+from jevmory.dream.engine import DreamReport, GradingNotEnabledError, run_dream
+from jevmory.dream.writer import (
     SentinelError,
-    render_jev_md,
-    write_jev_md,
+    render_jevmory,
+    write_jevmory,
 )
-from jev_md.ingestion.eventlog import optin_path, project_slug, store_path
-from jev_md.judgment.client import (
+from jevmory.ingestion.eventlog import optin_path, project_slug, store_path
+from jevmory.judgment.client import (
     DEFAULT_ENDPOINT,
     DEFAULT_MODEL,
     JevClient,
     JevResponse,
 )
-from jev_md.judgment.errors import JevError
-from jev_md.judgment.questions import phase_a_questions
-from jev_md.memory.schema import connect, migrate
+from jevmory.judgment.errors import JevError
+from jevmory.judgment.questions import phase_a_questions
+from jevmory.memory.schema import connect, migrate
 
 # The synthetic probe corpus: durable-sounding, project-free statements.
 # Nothing here is or references real project data, so the probe needs no
@@ -157,7 +157,7 @@ class DreamSmokeResult:
     """One dream smoke's outcome: the engine report + smoke bookkeeping."""
 
     report: DreamReport
-    artifact: str  # jev.md path written (sentinel rules applied)
+    artifact: str  # jevmory.md path written (sentinel rules applied)
     budget_calls: int  # requests counted against the cap
 
 
@@ -172,8 +172,8 @@ def run_dream_smoke(
 ):
     """One real dream run, budget-capped. Marker + key gate FIRST.
 
-    Mirrors ``jev-md dream``: same opt-in gate, same store, same
-    jev.md sentinel rules — the only addition is the request cap.
+    Mirrors ``jevmory dream``: same opt-in gate, same store, same
+    jevmory.md sentinel rules — the only addition is the request cap.
     """
     marker = optin_path(project_dir)
     if not marker.exists():
@@ -196,10 +196,10 @@ def run_dream_smoke(
         )
     finally:
         conn.close()
-    artifact = Path(project_dir) / "jev.md"
-    write_jev_md(
+    artifact = Path(project_dir) / "jevmory.md"
+    write_jevmory(
         artifact,
-        render_jev_md(
+        render_jevmory(
             report.facts,
             report.ask_pairs,
             sessions_by_fact=dict(report.sessions_by_fact),
@@ -217,7 +217,7 @@ def _default_transport():
     Private-symbol import on purpose: the budget wrapper must wrap the
     REAL transport, and this is the only way to reach it explicitly.
     """
-    from jev_md.judgment.client import _urllib_transport
+    from jevmory.judgment.client import _urllib_transport
 
     return _urllib_transport
 
@@ -265,7 +265,7 @@ def _print_dream(result: DreamSmokeResult) -> None:
         f"{report.duplicates} duplicates"
     )
     if report.asks:
-        print(f"asks:         {list(report.asks)} — jev-md resolve <id>")
+        print(f"asks:         {list(report.asks)} — jevmory resolve <id>")
     print(
         f"api:          {report.api_calls} calls, {report.usage_tokens} tokens "
         f"({result.budget_calls} counted against the cap)"
@@ -274,7 +274,7 @@ def _print_dream(result: DreamSmokeResult) -> None:
         "receipts:     usage + every answer are in the store's runs/"
         f"judgments tables (run #{run})"
     )
-    print(f"jev.md:     {result.artifact}")
+    print(f"jevmory.md:     {result.artifact}")
 
 
 # --- entry ---------------------------------------------------------------------
@@ -305,8 +305,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="dream stage: overwrite a foreign jev.md "
-        "(same rule as `jev-md dream --force`)",
+        help="dream stage: overwrite a foreign jevmory.md "
+        "(same rule as `jevmory dream --force`)",
     )
     args = parser.parse_args(argv)
 

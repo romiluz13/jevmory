@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import unittest
 
-from jev_md.audit.memfile import (
+from jevmory.audit.memfile import (
     MemoryLine,
     parse_memory_file,
     strip_inline_markup,
@@ -123,8 +123,8 @@ class ParseMemoryFileTest(unittest.TestCase):
 
     def test_html_comments_never_audited(self):
         text = (
-            "<!-- jev-md v0.1.0 sentinel — do not edit -->\n"
-            "# jev.md\n"
+            "<!-- jevmory v0.1.0 sentinel — do not edit -->\n"
+            "# jevmory.md\n"
             "- claim with <!-- inline note --> kept\n"
             "<!-- full line comment -->\n"
         )

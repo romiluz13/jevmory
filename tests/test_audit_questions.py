@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import unittest
 
-from jev_md.audit.memfile import MemoryLine
-from jev_md.audit.questions import (
+from jevmory.audit.memfile import MemoryLine
+from jevmory.audit.questions import (
     DISPOSITION_OPTIONS,
     audit_state,
     line_entry,

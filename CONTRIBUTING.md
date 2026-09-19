@@ -1,6 +1,6 @@
-# Contributing to jev-md
+# Contributing to jevmory
 
-Thanks for your interest. jev-md is deliberately small: a local,
+Thanks for your interest. jevmory is deliberately small: a local,
 zero-dependency CLI that turns coding-agent transcripts into
 receipts-backed memory. Keep it that way.
 
@@ -20,7 +20,7 @@ If that prints `OK`, you have a working development environment.
 
 1. **Stdlib only, forever.** No runtime dependencies — not even "small"
    ones. This is a mission invariant, enforced by
-   `tests/test_packaging.py`: it parses every module under `jev_md/`
+   `tests/test_packaging.py`: it parses every module under `jevmory/`
    with `ast` and fails on any non-stdlib import, and it pins that
    pyproject declares no dependencies. If a change seems to need a
    library, the change is wrong.
@@ -28,10 +28,10 @@ If that prints `OK`, you have a working development environment.
    are verbatim quotes with receipts, never model-written prose.
 3. **Privacy by architecture.** Hooks ingest transcripts locally;
    anything that leaves the machine must be a redacted quote, sent only
-   after the per-project opt-in (`jev-md init --enable-grading`). Every
+   after the per-project opt-in (`jevmory init --enable-grading`). Every
    new egress path needs a test proving it stays behind that gate.
 4. **Hooks never break sessions and never die silently.** Ingest always
-   exits 0; failures surface in `jev-md status`, never in the agent's
+   exits 0; failures surface in `jevmory status`, never in the agent's
    face.
 
 ## Tests
@@ -58,10 +58,10 @@ If that prints `OK`, you have a working development environment.
 
 - `docs/PLAN.md` — the product/engineering plan (what and why)
 - `docs/DOMAIN.md` — domain invariants (the non-negotiables)
-- `jev_md/` — the package: `ingestion/` (parsers, redaction, scan),
+- `jevmory/` — the package: `ingestion/` (parsers, redaction, scan),
   `judgment/` (Jev client, FakeJev), `memory/` (SQLite store, facts,
   receipts), `audit/` (memory-file grading, reports), `dream/`
-  (grading engine, `jev.md` writer), plus `cli.py` and `hook.py`
+  (grading engine, `jevmory.md` writer), plus `cli.py` and `hook.py`
 - `.ddd/notes/` — the running decision log
 - `demo/` — the offline planted-error demo; `scripts/live_smoke.py` —
   the budget-capped live-API smoke

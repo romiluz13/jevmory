@@ -26,7 +26,7 @@ where every fact is a verbatim quote graded by calibrated confidence.
   a report is reproducible from the store).
 - **Dream engine**: Phase A candidate grading and Phase B
   contradiction pairing composed into runs, ask expiry with human
-  `resolve`, and the `jev.md` writer with a versioned sentinel guard.
+  `resolve`, and the `jevmory.md` writer with a versioned sentinel guard.
 - **Audit**: any memory file graded line-by-line against stored
   evidence — screenshot-shaped terminal report plus `--md`/`--json`
   renderers, verdicts `KEEP / STALE / WRONG / UNSUPPORTED` with
@@ -47,4 +47,4 @@ where every fact is a verbatim quote graded by calibrated confidence.
   enforced by a packaging test that AST-scans the package.
 - No LLM generation anywhere: Jev judges; code selects and composes.
 
-[0.1.0]: https://github.com/romiluz13/jev-md/releases/tag/v0.1.0
+[0.1.0]: https://github.com/romiluz13/jevmory/releases/tag/v0.1.0

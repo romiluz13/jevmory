@@ -12,7 +12,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from jev_md.memory.facts import (
+from jevmory.memory.facts import (
     STATUS_ACTIVE,
     STATUS_ASK,
     STATUS_RETIRED,
@@ -37,8 +37,8 @@ from jev_md.memory.facts import (
     start_run,
     supersede,
 )
-from jev_md.memory.schema import connect, migrate
-from jev_md.thresholds import JACCARD_GATE
+from jevmory.memory.schema import connect, migrate
+from jevmory.thresholds import JACCARD_GATE
 
 T0 = "2026-09-19T00:00:00Z"
 T1 = "2026-09-19T00:01:00Z"

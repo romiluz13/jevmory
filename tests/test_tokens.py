@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import unittest
 
-from jev_md.judgment.questions import Question, phase_a_questions
-from jev_md.judgment.tokens import estimate_tokens, json_chars, questions_wire
-from jev_md.thresholds import CHARS_PER_TOKEN
+from jevmory.judgment.questions import Question, phase_a_questions
+from jevmory.judgment.tokens import estimate_tokens, json_chars, questions_wire
+from jevmory.thresholds import CHARS_PER_TOKEN
 
 
 def q(qid="c0", **overrides):

@@ -5,7 +5,7 @@
 Please do not open public issues for security problems. Use GitHub's
 private security advisory:
 
-1. Open <https://github.com/romiluz13/jev-md/security/advisories/new>
+1. Open <https://github.com/romiluz13/jevmory/security/advisories/new>
 2. Submit a description, reproduction steps, and impact.
 
 Expect a response within a few days. If the advisory system is
@@ -15,11 +15,11 @@ unreachable, contact the maintainer via their GitHub profile
 ## Privacy model (read before reporting data-leak bugs)
 
 - Session transcripts never leave your machine. Hooks ingest locally
-  into a per-project SQLite store under `~/.jev-md/`.
+  into a per-project SQLite store under `~/.jevmory/`.
 - Grading (`dream`, `audit` with a key set) sends redacted candidate
   quotes (≤600 chars), verbatim context (≤800 chars), and the project
   name — nothing else — and only when the project opted in
-  (`jev-md init --enable-grading`) and `$TYPESAFE_API_KEY` is set.
+  (`jevmory init --enable-grading`) and `$TYPESAFE_API_KEY` is set.
 - Redaction is deterministic and pattern-based (API keys, tokens, PEM
   blocks, credential assignments, high-entropy strings). It is
   best-effort, not a guarantee: non-secret content that merely looks
@@ -29,6 +29,6 @@ unreachable, contact the maintainer via their GitHub profile
 
 ## Scope
 
-In scope: everything under `jev_md/`, the hook entry points, and this
+In scope: everything under `jevmory/`, the hook entry points, and this
 repository's scripts. The Jev API service itself is out of scope here;
 report service issues to TypeSafe.

@@ -1,4 +1,4 @@
-"""jev.md writer tests (M5): pure rendering (pinned order, sorting,
+"""jevmory.md writer tests (M5): pure rendering (pinned order, sorting,
 receipts, stale badge, asks) and the sentinel guard."""
 
 from __future__ import annotations
@@ -7,17 +7,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jev_md import __version__
-from jev_md.dream.writer import (
+from jevmory import __version__
+from jevmory.dream.writer import (
     CATEGORY_ORDER,
     SENTINEL,
     SENTINEL_CORE,
     AskPair,
     SentinelError,
-    render_jev_md,
-    write_jev_md,
+    render_jevmory,
+    write_jevmory,
 )
-from jev_md.memory.facts import Fact
+from jevmory.memory.facts import Fact
 
 NOW = "2026-09-19T02:00:00Z"
 
@@ -48,14 +48,14 @@ def make_fact(
 
 class RenderDreamMdTest(unittest.TestCase):
     def test_sentinel_first_and_versioned(self):
-        md = render_jev_md([], now=NOW)
+        md = render_jevmory([], now=NOW)
         self.assertTrue(md.startswith(SENTINEL + "\n"))
         self.assertIn(f"v{__version__}", md.splitlines()[0])
         self.assertIn(SENTINEL_CORE, SENTINEL)
 
     def test_empty_renders_header_only(self):
-        md = render_jev_md([], now=NOW)
-        self.assertEqual(md, SENTINEL + "\n# jev.md\n")
+        md = render_jevmory([], now=NOW)
+        self.assertEqual(md, SENTINEL + "\n# jevmory.md\n")
 
     def test_categories_in_pinned_order_without_none(self):
         facts = [
@@ -66,7 +66,7 @@ class RenderDreamMdTest(unittest.TestCase):
             make_fact(id=5, claim="convention claim", category="convention"),
             make_fact(id=6, claim="uncategorized claim", category="none"),
         ]
-        md = render_jev_md(facts, now=NOW)
+        md = render_jevmory(facts, now=NOW)
         headings = [line for line in md.splitlines() if line.startswith("## ")]
         self.assertEqual(
             headings,
@@ -85,7 +85,7 @@ class RenderDreamMdTest(unittest.TestCase):
             make_fact(id=3, claim="claim 3", significance=2.0, confidence=0.8),
             make_fact(id=4, claim="claim 4", significance=2.0, confidence=0.8),
         ]
-        md = render_jev_md(facts, now=NOW)
+        md = render_jevmory(facts, now=NOW)
         order = [
             line.split('"')[1]
             for line in md.splitlines()
@@ -103,7 +103,7 @@ class RenderDreamMdTest(unittest.TestCase):
             confidence=0.8,
             support_count=3,
         )
-        md = render_jev_md([fact], now=NOW, sessions_by_fact={fact.id: 3})
+        md = render_jevmory([fact], now=NOW, sessions_by_fact={fact.id: 3})
         self.assertIn('- **"always run tests with uv run pytest"**', md)
         self.assertIn("`convention · important`", md)  # 1.6 rounds to 2
         self.assertIn("confidence **0.80** (2·|0.900−0.5|)", md)
@@ -113,26 +113,26 @@ class RenderDreamMdTest(unittest.TestCase):
         # without the session counts (pure caller, no store): the receipt
         # counts occurrences and says so — it never dresses an event
         # count up as a session count (S6)
-        fallback = render_jev_md([fact], now=NOW)
+        fallback = render_jevmory([fact], now=NOW)
         self.assertIn("seen 3 times", fallback)
         self.assertNotIn("sessions", fallback)
 
     def test_single_session_wording(self):
-        md = render_jev_md(
+        md = render_jevmory(
             [make_fact(support_count=1)], now=NOW, sessions_by_fact={1: 1}
         )
         self.assertIn("seen in 1 session", md)
         self.assertNotIn("seen in 1 sessions", md)
         # fallback without counts: one occurrence, honest singular
-        fallback = render_jev_md([make_fact(support_count=1)], now=NOW)
+        fallback = render_jevmory([make_fact(support_count=1)], now=NOW)
         self.assertIn("seen 1 time", fallback)
 
     def test_stale_badge_is_visual_only(self):
         fact = make_fact(last_supported_at="2026-05-01T00:00:00Z")
-        md = render_jev_md([fact], now=NOW)
+        md = render_jevmory([fact], now=NOW)
         self.assertIn("last seen May 1 · stale", md)
         # same fact, recent now: identical confidence (no decay, ever)
-        fresh = render_jev_md(
+        fresh = render_jevmory(
             [make_fact(last_supported_at="2026-09-18T00:00:00Z")], now=NOW
         )
         self.assertIn("confidence **0.80**", fresh)
@@ -140,18 +140,18 @@ class RenderDreamMdTest(unittest.TestCase):
 
     def test_unknown_category_is_rendered_not_hidden(self):
         fact = make_fact(category="legacy")  # data drift
-        md = render_jev_md([fact], now=NOW)
+        md = render_jevmory([fact], now=NOW)
         self.assertIn("## Legacy", md)
         self.assertIn(fact.claim, md)
 
     def test_newlines_in_claims_are_flattened(self):
         fact = make_fact(claim="line one\nline two\r\nline three")
-        md = render_jev_md([fact], now=NOW)
+        md = render_jevmory([fact], now=NOW)
         self.assertIn('- **"line one line two line three"**', md)
         self.assertNotIn("one\nline", md)  # claim never spans lines
 
     def test_significance_words_clamped_to_scale(self):
-        md = render_jev_md(
+        md = render_jevmory(
             [make_fact(significance=0.3), make_fact(significance=2.9)],
             now=NOW,
         )
@@ -169,63 +169,63 @@ class RenderDreamMdTest(unittest.TestCase):
             AskPair(fact=make_fact(id=8, status="ask"),
                     partner_id=None, partner_claim=None),
         ]
-        md = render_jev_md([], asks, now=NOW)
+        md = render_jevmory([], asks, now=NOW)
         self.assertIn("## Questions for you", md)
         self.assertIn(
             '- "we never deploy on fridays" (confidence 0.60) '
             'vs "always deploy on fridays" — which is current?',
             md,
         )
-        self.assertIn("`jev-md resolve 7 --keep-new|--keep-old`", md)
+        self.assertIn("`jevmory resolve 7 --keep-new|--keep-old`", md)
         # a missing partner link still renders with the resolve command
-        self.assertIn("`jev-md resolve 8 --keep-new|--keep-old`", md)
+        self.assertIn("`jevmory resolve 8 --keep-new|--keep-old`", md)
         self.assertNotIn("vs", md.split("resolve 8")[1].split("\n")[0])
 
     def test_render_is_pure_byte_identical(self):
         facts = [make_fact(id=i, claim=f"claim {i}") for i in range(3)]
         asks = [AskPair(fact=make_fact(id=9, status="ask"),
                         partner_id=1, partner_claim="partner")]
-        first = render_jev_md(facts, asks, now=NOW)
-        second = render_jev_md(facts, asks, now=NOW)
+        first = render_jevmory(facts, asks, now=NOW)
+        second = render_jevmory(facts, asks, now=NOW)
         self.assertEqual(first, second)
 
 
 class WriteDreamMdTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
-        self.path = Path(self._tmp.name) / "jev.md"
+        self.path = Path(self._tmp.name) / "jevmory.md"
 
     def tearDown(self):
         self._tmp.cleanup()
 
     def test_fresh_path_writes(self):
-        write_jev_md(self.path, render_jev_md([], now=NOW))
+        write_jevmory(self.path, render_jevmory([], now=NOW))
         self.assertTrue(self.path.exists())
         self.assertIn(SENTINEL_CORE, self.path.read_text())
 
     def test_regenerating_own_sentinel_is_fine(self):
-        write_jev_md(self.path, render_jev_md([], now=NOW))
-        write_jev_md(self.path, render_jev_md([], now=NOW))
+        write_jevmory(self.path, render_jevmory([], now=NOW))
+        write_jevmory(self.path, render_jevmory([], now=NOW))
         self.assertIn(SENTINEL_CORE, self.path.read_text())
 
     def test_foreign_file_is_refused(self):
         self.path.write_text("someone's hand-written notes\n")
         with self.assertRaises(SentinelError):
-            write_jev_md(self.path, render_jev_md([], now=NOW))
+            write_jevmory(self.path, render_jevmory([], now=NOW))
         # untouched
         self.assertEqual(self.path.read_text(), "someone's hand-written notes\n")
 
     def test_older_version_sentinel_still_regenerates(self):
-        old = "<!-- jev-md v0.0.1 sentinel — generated file, do not edit; " \
-              "regenerate with `jev-md dream` -->\nold contents\n"
+        old = "<!-- jevmory v0.0.1 sentinel — generated file, do not edit; " \
+              "regenerate with `jevmory dream` -->\nold contents\n"
         self.path.write_text(old)
-        write_jev_md(self.path, render_jev_md([], now=NOW))
+        write_jevmory(self.path, render_jevmory([], now=NOW))
         self.assertIn(f"v{__version__}", self.path.read_text())
 
     def test_force_overrides_foreign_file(self):
         self.path.write_text("someone's hand-written notes\n")
-        write_jev_md(self.path, render_jev_md([], now=NOW), force=True)
-        self.assertIn("# jev.md", self.path.read_text())
+        write_jevmory(self.path, render_jevmory([], now=NOW), force=True)
+        self.assertIn("# jevmory.md", self.path.read_text())
 
 
 if __name__ == "__main__":

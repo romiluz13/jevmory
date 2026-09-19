@@ -8,20 +8,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jev_md.dream import GradingNotEnabledError, run_dream
-from jev_md.dream.resolve import KEEP_NEW
-from jev_md.dream.writer import render_jev_md
-from jev_md.ingestion.eventlog import event_id, optin_path, store_path
-from jev_md.ingestion.extract import chunk_text
-from jev_md.judgment.errors import JevRetryExhausted
-from jev_md.judgment.fake import FakeJev
-from jev_md.memory.facts import (
+from jevmory.dream import GradingNotEnabledError, run_dream
+from jevmory.dream.resolve import KEEP_NEW
+from jevmory.dream.writer import render_jevmory
+from jevmory.ingestion.eventlog import event_id, optin_path, store_path
+from jevmory.ingestion.extract import chunk_text
+from jevmory.judgment.errors import JevRetryExhausted
+from jevmory.judgment.fake import FakeJev
+from jevmory.memory.facts import (
     STATUS_ASK,
     STATUS_SUPERSEDED,
     get_fact,
 )
-from jev_md.memory.schema import connect, migrate
-from jev_md.thresholds import (
+from jevmory.memory.schema import connect, migrate
+from jevmory.thresholds import (
     ASK_EXPIRY_DREAMS,
     MAX_CANDIDATES_PER_DREAM,
     NEAR_MISS_LOW,
@@ -141,7 +141,7 @@ class DreamEngineTest(unittest.TestCase):
                 self.conn, project="p", client=FakeJev(),
                 project_dir=str(other), home=self.home, now=NOW,
             )
-        self.assertIn("jev-md init --enable-grading", str(raised.exception))
+        self.assertIn("jevmory init --enable-grading", str(raised.exception))
         self.assertEqual(
             self.conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0], 0
         )
@@ -233,7 +233,7 @@ class DreamEngineTest(unittest.TestCase):
         fact = get_fact(self.conn, 1)
         self.assertEqual(fact.support_count, 3)      # three source events
         self.assertEqual(report.sessions_by_fact[fact.id], 2)  # two sessions
-        md = render_jev_md(
+        md = render_jevmory(
             report.facts,
             report.ask_pairs,
             sessions_by_fact=report.sessions_by_fact,
@@ -606,7 +606,7 @@ class DreamEngineTest(unittest.TestCase):
     # --- ask lifecycle end-to-end ---------------------------------------------
 
     def test_ask_resolves_keep_new_end_to_end(self):
-        from jev_md.dream import resolve
+        from jevmory.dream import resolve
 
         self.seed_fact(INCUMBENT)
         self.pair_dream({

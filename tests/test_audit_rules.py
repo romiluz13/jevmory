@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import unittest
 
-from jev_md.audit.memfile import MemoryLine
-from jev_md.audit.questions import DISPOSITION_OPTIONS
-from jev_md.audit.rules import (
+from jevmory.audit.memfile import MemoryLine
+from jevmory.audit.questions import DISPOSITION_OPTIONS
+from jevmory.audit.rules import (
     DISPOSITION_KEYWORDS,
     Q_CONTRADICTED,
     Q_DISPOSITION,
@@ -17,8 +17,8 @@ from jev_md.audit.rules import (
     count_dispositions,
     line_verdict,
 )
-from jev_md.judgment.answers import ChoiceAnswer, NoulAnswer
-from jev_md.thresholds import AUDIT_DISPOSITION_GATE
+from jevmory.judgment.answers import ChoiceAnswer, NoulAnswer
+from jevmory.thresholds import AUDIT_DISPOSITION_GATE
 
 
 def line(number=4):

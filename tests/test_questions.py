@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import unittest
 
-from jev_md.ingestion.extract import Candidate
-from jev_md.judgment.questions import (
+from jevmory.ingestion.extract import Candidate
+from jevmory.judgment.questions import (
     CATEGORY_OPTIONS,
     SIGNIFICANCE_LEVELS,
     VERDICT_OPTIONS,

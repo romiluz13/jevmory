@@ -17,14 +17,14 @@ What did you run, what did you expect, and what happened instead?
 
 **Environment**
 
-- jev-md version: output of `jev-md --version`
+- jevmory version: output of `jevmory --version`
 - Python version:
 - OS:
 - Agent (Claude Code / Codex CLI / other):
 
 **Store status**
 
-Output of `jev-md status` for the project, with anything sensitive
+Output of `jevmory status` for the project, with anything sensitive
 redacted. For crashes, also include the last error line it shows.
 
 <!-- Do not paste raw transcripts or secrets. Redaction is best-effort;

@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Propose a change to jev-md
+about: Propose a change to jevmory
 labels: enhancement
 assignees: ''
 ---

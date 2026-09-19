@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jev_md.ingestion.claude import parse_claude_transcript
+from jevmory.ingestion.claude import parse_claude_transcript
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "claude_session.jsonl"
 SESSION_ID = "00000000-0000-4000-8000-0000000000c1"

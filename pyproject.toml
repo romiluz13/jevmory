@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jev-md"
+name = "jevmory"
 version = "0.1.0"
 description = "Coding-agent memory where every fact is a verbatim quote graded by calibrated confidence."
 readme = "README.md"
@@ -37,12 +37,12 @@ classifiers = [
 # setuptools above is build-time only, used for the console entry point.
 
 [project.urls]
-Homepage = "https://github.com/romiluz13/jev-md"
-Bugs = "https://github.com/romiluz13/jev-md/issues"
-Changelog = "https://github.com/romiluz13/jev-md/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/romiluz13/jevmory"
+Bugs = "https://github.com/romiluz13/jevmory/issues"
+Changelog = "https://github.com/romiluz13/jevmory/blob/main/CHANGELOG.md"
 
 [project.scripts]
-jev-md = "jev_md.cli:main"
+jevmory = "jevmory.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["jev_md*"]
+include = ["jevmory*"]

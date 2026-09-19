@@ -17,7 +17,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jev_md.ingestion.scan import detect_source, discover_transcripts
+from jevmory.ingestion.scan import detect_source, discover_transcripts
 
 CLAUDE_SID = "00000000-0000-4000-8000-0000000000c1"
 CODEX_SID = "11111111-0000-4000-8000-0000000000d1"
@@ -165,9 +165,9 @@ class DiscoverTranscriptsTest(unittest.TestCase):
             self.cwd,
         )
         discover_transcripts(str(self.project), home=self.home)
-        # no jev-md state appeared anywhere under the scanned home
+        # no jevmory state appeared anywhere under the scanned home
         self.assertIsNone(
-            next(self.home.rglob(".jev-md"), None)
+            next(self.home.rglob(".jevmory"), None)
         )
 
 
@@ -187,7 +187,7 @@ class DetectSourceTest(unittest.TestCase):
     def test_location_hints_win_without_opening_the_file(self):
         # A path under .claude/ or .codex/ is decided by location alone;
         # these files do not even exist.
-        from jev_md.ingestion.scan import detect_source
+        from jevmory.ingestion.scan import detect_source
 
         self.assertEqual(detect_source("/nowhere/.claude/projects/x.jsonl"), "claude")
         self.assertEqual(detect_source("/nowhere/.codex/sessions/x.jsonl"), "codex")

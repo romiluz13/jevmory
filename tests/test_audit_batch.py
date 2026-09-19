@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import unittest
 
-from jev_md.audit.batch import plan_phase_c
-from jev_md.audit.memfile import MemoryLine
-from jev_md.judgment.batch import BatchError
-from jev_md.thresholds import BATCH_TOKEN_BUDGET
+from jevmory.audit.batch import plan_phase_c
+from jevmory.audit.memfile import MemoryLine
+from jevmory.judgment.batch import BatchError
+from jevmory.thresholds import BATCH_TOKEN_BUDGET
 
 
 def make_lines(count, text="claim about how this project works"):

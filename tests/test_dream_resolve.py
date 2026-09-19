@@ -7,14 +7,14 @@ import json
 import tempfile
 import unittest
 
-from jev_md.dream.resolve import (
+from jevmory.dream.resolve import (
     KEEP_NEW,
     KEEP_OLD,
     RESOLVE_CHOICES,
     bump_and_expire_asks,
     resolve,
 )
-from jev_md.memory.facts import (
+from jevmory.memory.facts import (
     STATUS_ACTIVE,
     STATUS_ASK,
     STATUS_RETIRED,
@@ -27,8 +27,8 @@ from jev_md.memory.facts import (
     mark_ask,
     start_run,
 )
-from jev_md.memory.schema import connect, migrate
-from jev_md.thresholds import ASK_EXPIRY_DREAMS
+from jevmory.memory.schema import connect, migrate
+from jevmory.thresholds import ASK_EXPIRY_DREAMS
 
 NOW = "2026-09-19T02:00:00Z"
 
