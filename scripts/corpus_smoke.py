@@ -5,8 +5,19 @@ Pinned, explicit file list (no globbing): the same files on every run,
 so the numbers are comparable across commits and across machines that
 share the corpus. Reads only; writes nothing; no network, no API key.
 
+The corpus list lives OUTSIDE this repo — real transcript paths are
+machine-local and private. Point JEV_MD_SMOKE_CORPUS at a text file with
+one `<path> <parser>` pair per line (`#` comments and blank lines
+ignored, `~` expanded):
+
+    JEV_MD_SMOKE_CORPUS=~/.jev-md/smoke-corpus.txt python3 scripts/corpus_smoke.py
+
+Pinning the same file keeps runs comparable; the env indirection keeps
+personal paths out of the repo and lets each machine pin its own corpus.
+
 Exit code 0 when at least one pinned file parsed; 1 when none did (the
-corpus moved, or a machine without transcripts — visible, not silent).
+corpus moved, the list is unset, or a machine without transcripts —
+visible, not silent).
 
 Run from the repo root:
 
@@ -15,6 +26,7 @@ Run from the repo root:
 
 from __future__ import annotations
 
+import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -27,52 +39,37 @@ from jev_md.ingestion.extract import extract_candidates
 from jev_md.ingestion.redact import redactions_in
 from jev_md.thresholds import CHUNK_MAX_CHARS, CONTEXT_MAX_CHARS, MIN_CANDIDATE_CHARS
 
-# (path, parser) — deliberate mix: mainline Claude sessions, one Claude
-# sidechain (agent-*.jsonl carrying the PARENT session id), and Codex
-# rollouts including the exact sessions the fixtures were rebuilt from.
-PINNED: tuple[tuple[str, str], ...] = (
-    (
-        "/Users/rom.iluz/.claude/projects/-Users-rom-iluz-Dev-orderly2/"
-        "f617f58f-40f9-4a35-9d77-69bb271400b2.jsonl",
-        "claude",
-    ),
-    (
-        "/Users/rom.iluz/.claude/projects/-Users-rom-iluz-Dev/"
-        "e37ab1d6-522b-4508-8df6-f5741bd07c38.jsonl",
-        "claude",
-    ),
-    (
-        "/Users/rom.iluz/.claude/projects/-Users-rom-iluz-Dev-mongodb-startup-sales/"
-        "1bca0ee8-600c-4d73-bace-907f5c018c94.jsonl",
-        "claude",
-    ),
-    (
-        "/Users/rom.iluz/.claude/projects/-Users-rom-iluz-Dev-mongodb-startup-sales/"
-        "1bca0ee8-600c-4d73-bace-907f5c018c94/subagents/"
-        "agent-abaffe40e686fe40f.jsonl",
-        "claude",
-    ),
-    (
-        "/Users/rom.iluz/.codex/sessions/2026/05/18/"
-        "rollout-2026-05-18T11-50-14-019e3a47-561e-73a0-9f5e-fa10a3c6deec.jsonl",
-        "codex",
-    ),
-    (
-        "/Users/rom.iluz/.codex/sessions/2026/05/18/"
-        "rollout-2026-05-18T08-26-23-019e398c-b549-7e63-ad82-eaca7a638dd9.jsonl",
-        "codex",
-    ),
-    (
-        "/Users/rom.iluz/.codex/sessions/2026/05/16/"
-        "rollout-2026-05-16T10-06-44-019e2f9b-ddc8-78b0-99e4-37c7c939f937.jsonl",
-        "codex",
-    ),
-    (
-        "/Users/rom.iluz/.codex/sessions/2026/05/05/"
-        "rollout-2026-05-05T18-11-08-019df8b1-6331-7490-88c1-9706016c931d.jsonl",
-        "codex",
-    ),
-)
+CORPUS_ENV = "JEV_MD_SMOKE_CORPUS"
+
+
+def load_pinned() -> tuple[tuple[str, str], ...]:
+    """Load (path, parser) pairs from the env-specified corpus file."""
+    list_path = os.environ.get(CORPUS_ENV)
+    if not list_path:
+        print(f"error: {CORPUS_ENV} is not set")
+        print(f"       write a corpus list file (one '<path> <parser>' per line,")
+        print("       '#' comments ignored) and point the env var at it, e.g.:")
+        print(f"       export {CORPUS_ENV}=~/.jev-md/smoke-corpus.txt")
+        return ()
+    file = Path(os.path.expanduser(list_path))
+    if not file.exists():
+        print(f"error: corpus list {file} does not exist")
+        return ()
+    pinned: list[tuple[str, str]] = []
+    for line in file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 2 or parts[1] not in ("claude", "codex"):
+            print(f"error: bad line in {file}: {line!r}")
+            print("       expected: <path> <claude|codex>")
+            return ()
+        pinned.append((os.path.expanduser(parts[0]), parts[1]))
+    return tuple(pinned)
+
+
+PINNED: tuple[tuple[str, str], ...] = load_pinned()
 
 PARSERS = {
     "claude": parse_claude_transcript,
