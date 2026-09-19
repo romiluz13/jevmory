@@ -6,10 +6,16 @@ Composes the M1-M4 layers into a single deterministic pass:
    per-project opt-in marker (``optin_path``); no marker means the
    engine refuses and the queue keeps waiting (PLAN #4).
 2. **Queue drain** — pending events (``graded_at IS NULL``) are
-   re-derived into candidates (``candidates_from_statements``;
-   context rebuilt per session) and grouped by normalized text + role
-   so a claim repeated across sessions is graded ONCE (support bumps
-   apply per occurrence event id).
+   re-derived into candidates (``candidates_from_statements``) over
+   the FULL statement history of the pending sessions — already-graded
+   turns included, so context is the real conversation, not just the
+   ungraded tail (review S4) — grouped by normalized text + role so a
+   claim repeated across sessions is graded ONCE (support bumps apply
+   per occurrence event id). A statement that chunks into multiple
+   candidates shares one event id but occupies distinct groups; every
+   verdict is routed by GROUP KEY ``(normalize_claim(text), role)``,
+   never by event id alone (review S1: event-id keying silently
+   discarded all but the last chunk's verdict).
 3. **Cap + ordering** — events are selected user-role-first (user
    statements are decisions), rowid order within; the cap counts
    candidate groups (``MAX_CANDIDATES_PER_DREAM``); events past it
@@ -31,11 +37,16 @@ Composes the M1-M4 layers into a single deterministic pass:
    overridden becomes an ask: both rows kept, the CHALLENGER held in
    the ask state (the incumbent stays active — a low-confidence
    challenger never displaces it, DOMAIN #3), linked ``contradicts``.
+   Pairs over ``CONTRADICTION_GATE`` that did NOT win the action keep
+   their ``contradicts`` edges anyway — the edge is evidence, not a
+   decision (review S2).
 8. **Close** — graded events stamped, run stats written, report
-   loaded from the store (facts + open asks for the writer).
+   loaded from the store (facts + open asks + per-fact distinct
+   session counts for the writer).
 
-On a ``JevError`` the run row is finished with the error and the
-exception re-raises; events stay pending (grading incomplete), and
+On a ``JevError`` — or ANY exception — the run row is finished with
+the error and the exception re-raises (review S3: a torn-down run row
+must never stay open); events stay pending (grading incomplete), and
 whatever was already written — receipts, facts — stands, exactly as
 recorded. The CLI (M6) owns messaging and exit codes.
 """
@@ -44,7 +55,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
@@ -90,7 +101,11 @@ from dream_md.memory.facts import (
     start_run,
     supersede,
 )
-from dream_md.thresholds import MAX_CANDIDATES_PER_DREAM, PAIR_SIGNIFICANCE_GATE
+from dream_md.thresholds import (
+    CONTRADICTION_GATE,
+    MAX_CANDIDATES_PER_DREAM,
+    PAIR_SIGNIFICANCE_GATE,
+)
 
 # Anything shaped like JevClient / FakeJev: an ``ask(state, questions)``.
 Asker = Callable[..., Any]
@@ -131,6 +146,10 @@ class DreamReport:
     asks_expired: tuple[int, ...]
     facts: tuple[Fact, ...]  # active after the run — render input
     ask_pairs: tuple[AskPair, ...]  # open asks — render input
+    # distinct observing sessions per fact id — the writer's "seen in
+    # N sessions" is this count, NOT support_count (which counts events;
+    # one session can observe a claim in several turns — review S6)
+    sessions_by_fact: Mapping[int, int] = field(default_factory=dict)
 
 
 def run_dream(
@@ -143,10 +162,16 @@ def run_dream(
     home: str | os.PathLike[str] | None = None,
     now: str | None = None,
     max_candidates: int | None = MAX_CANDIDATES_PER_DREAM,
+    enforce_optin: bool = True,
 ) -> DreamReport:
-    """Run one dream over the project's pending queue. See module docstring."""
+    """Run one dream over the project's pending queue. See module docstring.
+
+    ``enforce_optin=False`` is the CLI's ``--offline`` path: simulated
+    grading (FakeJev) never calls the API, so the opt-in gate — which
+    exists to guard API egress, not local computation — does not apply.
+    """
     marker = optin_path(project_dir, home=home)
-    if not marker.exists():
+    if enforce_optin and not marker.exists():
         raise GradingNotEnabledError(project_dir, str(marker))
     if max_candidates is not None and max_candidates <= 0:
         raise ValueError("max_candidates must be positive or None")
@@ -156,8 +181,19 @@ def run_dream(
     stamp = now or _utc_now()  # one timestamp for the whole run
 
     events = _pending_events(conn, project)
-    candidates = candidates_from_statements(events.statements)
-    keys = [(normalize_claim(c.text), c.role) for c in candidates]
+    # Context source: the FULL statement history of the pending sessions,
+    # already-graded turns included (review S4) — a graded decision the
+    # session made earlier is exactly the context a new candidate needs.
+    # Graded-turn candidates are filtered out: only pending groups grade.
+    pending_ids = set(events.ids)
+    candidates = [
+        candidate
+        for candidate in candidates_from_statements(
+            _session_statements(conn, project)
+        )
+        if candidate.event_id in pending_ids
+    ]
+    keys = [_group_key(c) for c in candidates]
 
     selected, deferred = _select_events(events, candidates, keys, max_candidates)
     selected_set = set(selected)
@@ -171,6 +207,7 @@ def run_dream(
 
     if not selected and not ask_facts(conn, project):
         # zero spend: no run row, no receipts, store state as-is
+        facts = tuple(active_facts(conn, project))
         return DreamReport(
             run_id=None,
             api_calls=0,
@@ -188,8 +225,9 @@ def run_dream(
             superseded=(),
             asks=(),
             asks_expired=(),
-            facts=tuple(active_facts(conn, project)),
+            facts=facts,
             ask_pairs=_ask_pairs(conn, project),
+            sessions_by_fact=_sessions_by_fact(conn, facts),
         )
 
     run_id = start_run(conn, project=project, kind="dream", now=stamp)
@@ -207,8 +245,20 @@ def run_dream(
         )
 
         # --- Phase A: grade the representatives ---------------------------
-        verdicts: dict[str, CandidateVerdict] = {}
-        by_event = {c.event_id: c for c in representatives}
+        # Verdicts are keyed by GROUP KEY (normalized text + role), never
+        # by event id: a statement that chunks into several candidates
+        # shares one event id across distinct groups, and event-id keying
+        # silently kept only the LAST chunk's verdict (review S1).
+        # ``by_event`` holds the representatives per event id in order;
+        # batch coverage is exact and order-preserving, so popping maps
+        # each batch position to its own representative — including
+        # same-event chunks.
+        verdicts: dict[tuple[str, str], CandidateVerdict] = {}
+        by_event: dict[str, list[Candidate]] = {}
+        for representative in representatives:
+            by_event.setdefault(representative.event_id, []).append(
+                representative
+            )
         if representatives:
             for batch in plan_phase_a(representatives, context):
                 response = client.ask(batch.state, batch.questions)
@@ -218,17 +268,20 @@ def run_dream(
                     + response.usage.output_tokens
                 )
                 for position, event_id in enumerate(batch.candidate_ids):
+                    representative = by_event[event_id].pop(0)
                     durable = response.answers[f"c{position}_durable"]
                     category = response.answers[f"c{position}_category"]
                     significance = response.answers[
                         f"c{position}_significance"
                     ]
+                    # the receipt subject stays the event id: provenance
+                    # (which transcript turn was graded), not routing
                     _receipt_candidate(
                         conn, run_id, event_id,
                         durable, category, significance, now=stamp,
                     )
-                    verdicts[event_id] = phase_a_verdict(
-                        by_event[event_id],
+                    verdicts[_group_key(representative)] = phase_a_verdict(
+                        representative,
                         durable,
                         category,
                         significance,
@@ -246,13 +299,10 @@ def run_dream(
 
         # --- survivor routing: dedupe, pass-through, or pairing -----------
         pair_plans: list[PairPlan] = []
-        pair_verdicts: dict[str, list[PairVerdict]] = {}
+        pair_verdicts: dict[tuple[str, str], list[PairVerdict]] = {}
         for verdict in (v for v in verdicts.values() if v.kept):
             occurrences = tuple(
-                c.event_id for c in grade_groups[
-                    (normalize_claim(verdict.candidate.text),
-                     verdict.candidate.role)
-                ]
+                c.event_id for c in grade_groups[_group_key(verdict.candidate)]
             )
             duplicate = find_code_duplicate(conn, verdict.candidate.text)
             if duplicate is not None:
@@ -309,7 +359,7 @@ def run_dream(
                         same, contradicts, verdict, now=stamp,
                     )
                     pair_verdicts.setdefault(
-                        plan.candidate.event_id, []
+                        _group_key(plan.candidate), []
                     ).append(
                         PairVerdict(
                             candidate_event_id=plan.candidate.event_id,
@@ -323,15 +373,12 @@ def run_dream(
 
         # --- apply Phase B verdicts (representative order) ----------------
         for plan in pair_plans:
-            event_id = plan.candidate.event_id
-            verdict = verdicts[event_id]
+            key = _group_key(plan.candidate)
+            verdict = verdicts[key]
             occurrences = tuple(
-                c.event_id for c in grade_groups[
-                    (normalize_claim(verdict.candidate.text),
-                     verdict.candidate.role)
-                ]
+                c.event_id for c in grade_groups[_group_key(verdict.candidate)]
             )
-            of_candidate = pair_verdicts.get(event_id, [])
+            of_candidate = pair_verdicts.get(key, [])
             duplicates = [p for p in of_candidate
                           if p.action == ACTION_DUPLICATE]
             supersedes = [p for p in of_candidate
@@ -347,6 +394,10 @@ def run_dream(
                         source_event_id=occurrence, now=stamp,
                     )
                 duplicates_jev += 1
+                # the merged claim keeps its contradicts evidence against
+                # every over-gate partner it did NOT merge into (S2)
+                for pair in _conflict_evidence(of_candidate, best):
+                    add_link(conn, best.fact_id, pair.fact_id, "contradicts")
             elif supersedes:
                 best = max(
                     supersedes,
@@ -360,6 +411,10 @@ def run_dream(
                     conn, best.fact_id, by_fact_id=new_fact.id, now=stamp
                 )
                 superseded_ids.append(best.fact_id)
+                # conflicts against facts it did not supersede are kept
+                # as contradicts edges — evidence, not a decision (S2)
+                for pair in _conflict_evidence(of_candidate, best):
+                    add_link(conn, new_fact.id, pair.fact_id, "contradicts")
             elif conflicts:
                 new_fact = _add_fact(
                     conn, project, verdict, occurrences, now=stamp
@@ -384,6 +439,12 @@ def run_dream(
                     ((stamp, event_id) for event_id in selected),
                 )
     except JevError as error:
+        finish_run(conn, run_id, error=type(error).__name__, now=stamp)
+        raise
+    except BaseException as error:
+        # KeyboardInterrupt, MemoryError, store corruption — anything at
+        # all: the run row closes with the error, then the exception
+        # propagates unchanged (review S3: no open run rows, ever)
         finish_run(conn, run_id, error=type(error).__name__, now=stamp)
         raise
 
@@ -411,6 +472,7 @@ def run_dream(
         },
         now=stamp,
     )
+    final_facts = tuple(active_facts(conn, project))
     return DreamReport(
         run_id=run_id,
         api_calls=api_calls,
@@ -428,8 +490,9 @@ def run_dream(
         superseded=tuple(superseded_ids),
         asks=tuple(ask_ids),
         asks_expired=expired,
-        facts=tuple(active_facts(conn, project)),
+        facts=final_facts,
         ask_pairs=_ask_pairs(conn, project),
+        sessions_by_fact=_sessions_by_fact(conn, final_facts),
     )
 
 
@@ -440,23 +503,22 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _group_key(candidate: Candidate) -> tuple[str, str]:
+    """Group identity: normalized claim + role.
+
+    Chunks of one statement share an event id but differ in text, so
+    an event id can NEVER identify a group (review S1) — only this key
+    can, and it is exactly the grouping key of ``grade_groups``.
+    """
+    return (normalize_claim(candidate.text), candidate.role)
+
+
 class _PendingEvents:
-    """Pending event rows in rowid order, Statement-shaped for extraction."""
+    """Pending event rows in rowid order: ids + roles for selection."""
 
     def __init__(self, rows: Sequence[sqlite3.Row | tuple]) -> None:
         self.ids: list[str] = [row[0] for row in rows]
         self.roles: list[str] = [row[3] for row in rows]
-        self.statements = [
-            Statement(
-                line_no=0,
-                index=0,
-                ts=row[2],
-                role=row[3],
-                text=row[4],
-                session_id=row[1],
-            )
-            for row in rows
-        ]
 
 
 def _pending_events(conn: sqlite3.Connection, project: str) -> _PendingEvents:
@@ -466,6 +528,88 @@ def _pending_events(conn: sqlite3.Connection, project: str) -> _PendingEvents:
         (project,),
     ).fetchall()
     return _PendingEvents(rows)
+
+
+def _session_statements(
+    conn: sqlite3.Connection, project: str
+) -> list[Statement]:
+    """Statements of the pending sessions, rowid order (review S4).
+
+    Pending turns of the project (whatever their session id, NULL
+    included) PLUS the already-graded turns of those sessions — one
+    query. The graded turns yield candidates too; the caller filters
+    them out and keeps only their context: a decision the session made
+    in an earlier, already-graded turn is exactly the context a new
+    candidate needs.
+    """
+    rows = conn.execute(
+        "SELECT id, session_id, ts, role, text FROM events "
+        "WHERE project = ? AND ("
+        "    graded_at IS NULL"
+        "    OR session_id IN ("
+        "        SELECT DISTINCT session_id FROM events"
+        "        WHERE project = ? AND graded_at IS NULL"
+        "          AND session_id IS NOT NULL"
+        "    )"
+        ") ORDER BY rowid",
+        (project, project),
+    ).fetchall()
+    return [
+        Statement(
+            line_no=0,
+            index=0,
+            ts=row[2],
+            role=row[3],
+            text=row[4],
+            session_id=row[1],
+        )
+        for row in rows
+    ]
+
+
+def _sessions_by_fact(
+    conn: sqlite3.Connection, facts: Sequence[Fact]
+) -> dict[int, int]:
+    """Distinct observing sessions per fact id (review S6).
+
+    ``support_count`` counts source EVENTS; one session can observe a
+    claim across several turns. The writer's "seen in N sessions"
+    renders this count, not support_count. Source id lists are chunked
+    to stay under SQLite's bound-variable limit; a fact observed only
+    under NULL sessions still claims one session — it was observed.
+    """
+    counts: dict[int, int] = {}
+    for fact in facts:
+        sessions: set[str] = set()
+        ids = list(fact.source_event_ids)
+        for start in range(0, len(ids), 400):
+            chunk = ids[start:start + 400]
+            placeholders = ",".join("?" * len(chunk))
+            rows = conn.execute(
+                f"SELECT DISTINCT session_id FROM events "
+                f"WHERE id IN ({placeholders})",
+                tuple(chunk),
+            ).fetchall()
+            sessions.update(row[0] for row in rows if row[0] is not None)
+        counts[fact.id] = max(len(sessions), 1)
+    return counts
+
+
+def _conflict_evidence(
+    pairs: Sequence[PairVerdict], best: PairVerdict
+) -> list[PairVerdict]:
+    """Over-gate pairs that did not win the action (review S2).
+
+    Their ``contradicts`` answers are evidence that the runner-up
+    facts conflict with the surviving claim; the edge is recorded, the
+    decision is not — one disposition per candidate, all evidence on
+    the graph.
+    """
+    return [
+        pair
+        for pair in pairs
+        if pair is not best and pair.contradicts.noul >= CONTRADICTION_GATE
+    ]
 
 
 def _select_events(
@@ -543,7 +687,12 @@ def _add_fact(
 
 
 def _ask_pairs(conn: sqlite3.Connection, project: str) -> tuple[AskPair, ...]:
-    """Open asks with their contradicts partner, for the writer."""
+    """Open asks with their oldest contradicts partner, for the writer.
+
+    An ask can carry several contradicts links now (S2 keeps every
+    over-gate edge); the writer's question line shows the oldest
+    partner, while ``resolve`` acts on all of them.
+    """
     pairs = []
     for fact in ask_facts(conn, project):
         partner = contradicts_partner(conn, fact.id)

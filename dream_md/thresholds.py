@@ -80,9 +80,10 @@ AUDIT_DISPOSITION_GATE = 0.6
 # assistant-role; a user's first dream on a long-lived project is the budget
 # spike. The cap counts candidate GROUPS (deduped by normalized text + role);
 # events left beyond it stay pending (graded next dream, counted in stats as
-# events_deferred). None means uncapped; the value is tuned at the live smoke
-# run against the ~40-request budget cap, not guessed in advance.
-MAX_CANDIDATES_PER_DREAM: int | None = None
+# events_deferred). 50 groups is ~2 Phase A requests at the batch budget;
+# None means uncapped (explicit opt-in only — the engine default must bound
+# the first-dream spend). Review S5: an uncapped default is a footgun.
+MAX_CANDIDATES_PER_DREAM: int | None = 50
 
 
 def clamp01(value: float) -> float:

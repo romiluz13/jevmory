@@ -89,8 +89,60 @@ class AskLifecycleTest(unittest.TestCase):
         self.assertEqual(
             json.loads(stats),
             {"resolution": "keep_new", "fact_id": ask.id,
-             "partner_id": self.incumbent.id},
+             "partner_ids": [self.incumbent.id]},
         )
+
+    def test_resolve_keep_new_supersedes_every_partner(self):
+        # S7: an ask can conflict with SEVERAL facts (the engine keeps
+        # every over-gate contradicts edge, S2); one keep-new decision
+        # settles the whole conflict set, not just the oldest link.
+        ask = self.make_ask()
+        second = add_fact(
+            self.conn, project="p",
+            claim="deploy windows are announced tuesday mornings",
+            category="convention", significance=2.0, durable_noul=0.9,
+            now=NOW,
+        )
+        add_link(self.conn, ask.id, second.id, "contradicts")
+        final = resolve(self.conn, ask.id, KEEP_NEW, now=NOW)
+        self.assertEqual(final.status, STATUS_ACTIVE)
+        self.assertEqual(
+            get_fact(self.conn, self.incumbent.id).status, STATUS_SUPERSEDED
+        )
+        self.assertEqual(get_fact(self.conn, second.id).status,
+                         STATUS_SUPERSEDED)
+        supersedes = self.conn.execute(
+            "SELECT fact_id, related_id FROM fact_links "
+            "WHERE relation = 'supersedes' ORDER BY rowid"
+        ).fetchall()
+        self.assertEqual(
+            supersedes,
+            [(ask.id, self.incumbent.id), (ask.id, second.id)],
+        )
+        kind, stats, error = self.run_row()
+        self.assertIsNone(error)
+        self.assertEqual(
+            json.loads(stats),
+            {"resolution": "keep_new", "fact_id": ask.id,
+             "partner_ids": [self.incumbent.id, second.id]},
+        )
+
+    def test_resolve_keep_old_with_many_partners_retires_challenger_only(self):
+        ask = self.make_ask()
+        second = add_fact(
+            self.conn, project="p",
+            claim="deploy windows are announced tuesday mornings",
+            category="convention", significance=2.0, durable_noul=0.9,
+            now=NOW,
+        )
+        add_link(self.conn, ask.id, second.id, "contradicts")
+        final = resolve(self.conn, ask.id, KEEP_OLD, now=NOW)
+        self.assertEqual(final.status, STATUS_RETIRED)
+        # every partner untouched: they stayed active all along
+        self.assertEqual(
+            get_fact(self.conn, self.incumbent.id).status, STATUS_ACTIVE
+        )
+        self.assertEqual(get_fact(self.conn, second.id).status, STATUS_ACTIVE)
 
     def test_resolve_keep_old_retires_challenger(self):
         ask = self.make_ask()

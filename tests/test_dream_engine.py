@@ -10,7 +10,9 @@ from pathlib import Path
 
 from dream_md.dream import GradingNotEnabledError, run_dream
 from dream_md.dream.resolve import KEEP_NEW
+from dream_md.dream.writer import render_dream_md
 from dream_md.ingestion.eventlog import event_id, optin_path, store_path
+from dream_md.ingestion.extract import chunk_text
 from dream_md.judgment.errors import JevRetryExhausted
 from dream_md.judgment.fake import FakeJev
 from dream_md.memory.facts import (
@@ -21,6 +23,7 @@ from dream_md.memory.facts import (
 from dream_md.memory.schema import connect, migrate
 from dream_md.thresholds import (
     ASK_EXPIRY_DREAMS,
+    MAX_CANDIDATES_PER_DREAM,
     NEAR_MISS_LOW,
     PAIR_SIGNIFICANCE_GATE,
 )
@@ -200,6 +203,44 @@ class DreamEngineTest(unittest.TestCase):
         self.assertEqual(report.facts_added, ())
         self.assertEqual(self.pending_count(), 0)
 
+    def test_context_includes_already_graded_turns(self):
+        # S4: a pending candidate's context is the real conversation —
+        # including turns an earlier dream already graded. Building
+        # context from the pending tail only starved new candidates of
+        # the session's earlier decisions.
+        self.add_event("we settled on postgres fifteen for the audit service")
+        self.dream(FakeJev())  # grades it into fact 1
+        self.add_event("the retention window is ninety days, not thirty")
+        report = self.dream(
+            FakeJev(mode="scripted", answers=scripted_phase_a(significance=1.0))
+        )
+        self.assertEqual(report.events_graded, 1)  # only the new event
+        self.assertEqual(report.facts_added, (2,))
+        self.assertEqual([f.id for f in report.facts], [1, 2])
+        fact = get_fact(self.conn, 2)
+        self.assertIsNotNone(fact.context)
+        self.assertIn("postgres fifteen", fact.context)  # graded turn as context
+
+    def test_sessions_by_fact_counts_distinct_sessions(self):
+        # S6: "seen in N sessions" must count SESSIONS, not source
+        # events — one session observing a claim across several turns
+        # is ONE session; support_count says three, sessions say two.
+        claim = "always run migrations from the makefile target in this repo"
+        self.add_event(claim)                        # s1, first occurrence
+        self.add_event(claim.upper(), session="s1")  # s1 again, new wording
+        self.add_event(claim, session="s2")          # a second session
+        report = self.dream(FakeJev())
+        fact = get_fact(self.conn, 1)
+        self.assertEqual(fact.support_count, 3)      # three source events
+        self.assertEqual(report.sessions_by_fact[fact.id], 2)  # two sessions
+        md = render_dream_md(
+            report.facts,
+            report.ask_pairs,
+            sessions_by_fact=report.sessions_by_fact,
+        )
+        self.assertIn("seen in 2 sessions", md)
+        self.assertNotIn("seen in 3 sessions", md)
+
     def test_state_reaches_client_with_default_context(self):
         self.add_event("we prefer uv over pip for this project")
         client = FakeJev()
@@ -229,6 +270,52 @@ class DreamEngineTest(unittest.TestCase):
         )
         self.assertEqual(by_question["durable"], {"type": "noul", "noul": 0.9})
         self.assertEqual(by_question["category"]["choice"], "convention")
+
+    # --- multi-chunk statements (review S1) -----------------------------------
+
+    def test_multi_chunk_statement_routes_every_chunk(self):
+        # S1 regression: a statement long enough to chunk into several
+        # candidates shares ONE event id across distinct groups. Verdict
+        # routing is by group key (normalized text + role); event-id
+        # routing silently kept only the LAST chunk's verdict — the
+        # earlier chunk was graded, receipted, then discarded without
+        # its fact ever being created.
+        sentence_a = (
+            "deployment for this service always runs through the blue "
+            "green pipeline with a two minute bake before traffic shifts "
+            "over, and the release checklist requires a signed changelog "
+            "entry attached to every rollout ticket before the on call "
+            "engineer approves the shift during weekday mornings, and "
+            "rollback is a single revert of the traffic shift flag"
+        )
+        sentence_b = (
+            "database backups are taken nightly to the cold storage bucket "
+            "with thirty five day retention, restored quarterly during the "
+            "disaster recovery rehearsal, and the restore drill logs go to "
+            "the audit folder that compliance reviews every quarter, and "
+            "the rehearsal results are filed with the quarterly audit"
+        )
+        statement = f"{sentence_a} {sentence_b}"
+        chunks = chunk_text(statement)
+        self.assertEqual(len(chunks), 2)  # fixture shape: two chunks, one event
+        event = self.add_event(statement)
+        report = self.dream(FakeJev())
+        self.assertEqual(report.events_graded, 1)  # ONE event...
+        self.assertEqual(report.candidates_graded, 2)  # ...TWO groups
+        self.assertEqual(report.occurrences, 2)
+        self.assertEqual(report.facts_added, (1, 2))  # both chunks became facts
+        self.assertEqual(
+            [fact.claim for fact in report.facts], chunks
+        )
+        # receipts: three questions per chunk, all provenance-tagged with
+        # the shared event id (subject = provenance, routing = group key)
+        rows = [
+            row for row in self.judgments(report.run_id)
+            if row[1] == "candidate"
+        ]
+        self.assertEqual(len(rows), 6)
+        self.assertEqual({row[2] for row in rows}, {event})
+        self.assertEqual(self.pending_count(), 0)
 
     # --- cap and ordering (review R10) --------------------------------------
 
@@ -439,6 +526,63 @@ class DreamEngineTest(unittest.TestCase):
         self.assertEqual(get_fact(self.conn, 2).status, "active")
         self.assertEqual(get_fact(self.conn, 2).support_count, 2)
 
+    def test_duplicate_winner_keeps_runner_up_conflict_edges(self):
+        # S2: the winning pair records its decision; every OTHER
+        # over-gate pair keeps its contradicts edge — the edge is
+        # evidence, not a decision. Old code dropped the runner-up
+        # evidence entirely (no link, no ask, nothing).
+        self.seed_fact(INCUMBENT)
+        self.seed_fact(UNRELATED)
+        self.add_event(CHALLENGER)
+        answers = {
+            **scripted_phase_a(),
+            # vs fact 1: conflict, not decisively overridden -> ask action
+            **scripted_pair("p0_0", same=0.15, contra=0.9,
+                            verdict="old_stands", confidence=0.3),
+            # vs fact 2: same claim -> duplicate wins the disposition
+            **scripted_pair("p0_1", same=0.9, contra=0.05),
+        }
+        report = self.dream(FakeJev(mode="scripted", answers=answers))
+        self.assertEqual(report.duplicates, 1)
+        self.assertEqual(report.asks, ())  # duplicate won: no ask created
+        self.assertEqual(get_fact(self.conn, 1).status, "active")
+        self.assertEqual(get_fact(self.conn, 2).support_count, 2)
+        # the merged claim carries its conflict evidence against fact 1
+        links = self.conn.execute(
+            "SELECT fact_id, related_id, relation FROM fact_links "
+            "WHERE relation = 'contradicts'"
+        ).fetchall()
+        self.assertEqual(links, [(2, 1, "contradicts")])
+
+    def test_supersede_winner_keeps_runner_up_conflict_edges(self):
+        # S2, supersede branch: the new fact supersedes the decisive
+        # partner and keeps contradicts edges to the over-gate
+        # runner-ups — one decision, all the evidence.
+        self.seed_fact(INCUMBENT)
+        self.seed_fact(UNRELATED)
+        self.add_event(CHALLENGER)
+        answers = {
+            **scripted_phase_a(),
+            # vs fact 1: decisive override -> supersede wins
+            **scripted_pair("p0_0", same=0.1, contra=0.9,
+                            verdict="new_overrides", confidence=0.9),
+            # vs fact 2: conflict, not decisive -> runner-up evidence only
+            **scripted_pair("p0_1", same=0.1, contra=0.85,
+                            verdict="old_stands", confidence=0.3),
+        }
+        report = self.dream(FakeJev(mode="scripted", answers=answers))
+        self.assertEqual(report.superseded, (1,))
+        self.assertEqual(report.facts_added, (3,))
+        links = sorted(self.conn.execute(
+            "SELECT fact_id, related_id, relation FROM fact_links "
+            "WHERE relation IN ('supersedes', 'contradicts')"
+        ).fetchall())
+        self.assertEqual(
+            links, [(3, 1, "supersedes"), (3, 2, "contradicts")]
+        )
+        # the runner-up fact stays active: evidence recorded, no decision
+        self.assertEqual(get_fact(self.conn, 2).status, "active")
+
     def test_pair_receipts_recorded_per_fact(self):
         self.seed_fact(INCUMBENT)
         report = self.pair_dream({
@@ -505,6 +649,24 @@ class DreamEngineTest(unittest.TestCase):
         ).fetchall()
         self.assertEqual(receipts, [("expiry",)])
 
+    # --- cap default (review S5) ----------------------------------------------
+
+    def test_default_cap_is_fifty_groups(self):
+        # 60 single-candidate events: the DEFAULT cap (no explicit
+        # max_candidates) grades 50 groups and defers the rest — an
+        # uncapped default was a first-dream budget footgun (S5)
+        for n in range(60):
+            self.add_event(
+                f"decision number {n:02d} about distinct tooling topic",
+                session=f"s{n:02d}",
+            )
+        report = self.dream(FakeJev())
+        self.assertEqual(report.candidates_graded, 50)
+        self.assertEqual(report.events_graded, 50)
+        self.assertEqual(report.events_deferred, 10)
+        self.assertEqual(self.pending_count(), 10)
+        self.assertEqual(MAX_CANDIDATES_PER_DREAM, 50)
+
     # --- multi-batch phase A ----------------------------------------------------
 
     def test_many_candidates_split_across_batches(self):
@@ -512,7 +674,9 @@ class DreamEngineTest(unittest.TestCase):
         # salad per claim (Jaccard ~0.09, far under the dedupe gate) so
         # all 120 become facts; the ~800-char same-session context makes
         # entries exceed the Phase A batch budget and split across API
-        # calls; every position must map back to its own event
+        # calls; every position must map back to its own event.
+        # max_candidates=None: this test is about BATCH SPLITTING, not
+        # the default cap (that is test_default_cap_is_fifty_groups).
         for i in range(120):
             words = " ".join(f"w{i:03d}{j:02d}" for j in range(60))
             self.add_event(
@@ -520,7 +684,7 @@ class DreamEngineTest(unittest.TestCase):
                 session="s0",
             )
         client = FakeJev()
-        report = self.dream(client)
+        report = self.dream(client, max_candidates=None)
         self.assertGreater(client.call_count, 1)
         self.assertEqual(report.api_calls, client.call_count)
         self.assertEqual(report.candidates_graded, 120)
@@ -554,6 +718,20 @@ class DreamEngineTest(unittest.TestCase):
         report = self.dream(FakeJev())
         self.assertEqual(report.events_graded, 1)
         self.assertEqual(self.pending_count(), 0)
+
+    def test_unexpected_error_also_closes_the_run_row(self):
+        # S3: JevError closes the run row — and so must ANY exception.
+        # A KeyboardInterrupt or MemoryError tearing the run down mid-
+        # flight must never leave an open run row behind.
+        self.add_event("one more durable user statement about linting")
+        client = FakeJev(errors={"always": RuntimeError("interpreter blew up")})
+        with self.assertRaises(RuntimeError):
+            self.dream(client)
+        kind, stats, error, finished = self.run_row()
+        self.assertEqual((kind, error, finished),
+                         ("dream", "RuntimeError", NOW))
+        self.assertIsNone(stats)
+        self.assertEqual(self.pending_count(), 1)  # grading incomplete
 
 
 if __name__ == "__main__":

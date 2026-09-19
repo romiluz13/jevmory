@@ -103,17 +103,29 @@ class RenderDreamMdTest(unittest.TestCase):
             confidence=0.8,
             support_count=3,
         )
-        md = render_dream_md([fact], now=NOW)
+        md = render_dream_md([fact], now=NOW, sessions_by_fact={fact.id: 3})
         self.assertIn('- **"always run tests with uv run pytest"**', md)
         self.assertIn("`convention · important`", md)  # 1.6 rounds to 2
         self.assertIn("confidence **0.80** (2·|0.900−0.5|)", md)
         self.assertIn("seen in 3 sessions", md)
         self.assertIn("last seen Sep 1", md)
         self.assertNotIn("stale", md)  # 18 days: no badge
+        # without the session counts (pure caller, no store): the receipt
+        # counts occurrences and says so — it never dresses an event
+        # count up as a session count (S6)
+        fallback = render_dream_md([fact], now=NOW)
+        self.assertIn("seen 3 times", fallback)
+        self.assertNotIn("sessions", fallback)
 
     def test_single_session_wording(self):
-        md = render_dream_md([make_fact(support_count=1)], now=NOW)
+        md = render_dream_md(
+            [make_fact(support_count=1)], now=NOW, sessions_by_fact={1: 1}
+        )
         self.assertIn("seen in 1 session", md)
+        self.assertNotIn("seen in 1 sessions", md)
+        # fallback without counts: one occurrence, honest singular
+        fallback = render_dream_md([make_fact(support_count=1)], now=NOW)
+        self.assertIn("seen 1 time", fallback)
 
     def test_stale_badge_is_visual_only(self):
         fact = make_fact(last_supported_at="2026-05-01T00:00:00Z")

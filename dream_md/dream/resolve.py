@@ -2,17 +2,20 @@
 
 An ask is a conflict the Jev verdict could not decide: both rows are
 kept, the challenger is held in the ``ask`` status (out of active
-memory, receipts intact) with a ``contradicts`` link to the incumbent.
+memory, receipts intact) with ``contradicts`` links to every incumbent
+it conflicted with (review S2 keeps all over-gate edges).
 
 - ``resolve`` (human): ``dream-md resolve <fact_id> --keep-new|--keep-old``
-  writes a resolution receipt under a ``resolve`` run and applies it.
+  writes a resolution receipt under a ``resolve`` run and applies it —
+  against ALL of the ask's contradicts partners (review S7): one
+  decision settles the whole conflict set, not just the oldest edge.
 - ``bump_and_expire_asks`` (dream): every dream that begins with an
   ask unresolved increments ``ask_seen_count``; at
   ``ASK_EXPIRY_DREAMS`` the ask expires — disposition ``keep-old``:
-  the incumbent stays active (it never left), the challenger retires.
-  Absent a human decision the remembered fact wins, mirroring the
-  no-decay stance (absence of resolution is not evidence against the
-  incumbent; a low-confidence challenger never displaces it).
+  the incumbents stay active (they never left), the challenger
+  retires. Absent a human decision the remembered facts win, mirroring
+  the no-decay stance (absence of resolution is not evidence against
+  the incumbents; a low-confidence challenger never displaces them).
 
 Resolution/expiry receipts are choice answers with confidence 1.0 and
 a peaked distribution: a decision by fiat, not a calibrated guess —
@@ -28,7 +31,7 @@ from dream_md.memory.facts import (
     Fact,
     ask_facts,
     bump_ask,
-    contradicts_partner,
+    contradicts_partners,
     finish_run,
     get_fact,
     record_judgment,
@@ -61,10 +64,11 @@ def resolve(
 ) -> Fact:
     """Close one ask by human decision and return the fact's final state.
 
-    ``keep-new``: the challenger becomes the active truth — the
-    incumbent is superseded (linked, out of FTS, row kept) and the
+    ``keep-new``: the challenger becomes the active truth — every
+    contradicts partner is superseded (linked, out of FTS, rows kept;
+    review S7: one decision settles the whole conflict set) and the
     challenger reactivates (back in FTS). ``keep-old``: the challenger
-    retires; the incumbent is untouched (it stayed active all along).
+    retires; the partners are untouched (they stayed active all along).
     """
     fact = get_fact(conn, fact_id)
     if fact is None:
@@ -78,15 +82,16 @@ def resolve(
         raise ValueError(
             f"choice must be one of {RESOLVE_CHOICES}, got {choice!r}"
         )
-    partner = contradicts_partner(conn, fact_id)
-    if partner is None:
+    partners = contradicts_partners(conn, fact_id)
+    if not partners:
         raise ValueError(
-            f"ask fact {fact_id} has no contradicts partner to resolve against"
+            f"ask fact {fact_id} has no contradicts partners to resolve against"
         )
 
     run_id = start_run(conn, project=fact.project, kind="resolve", now=now)
     if choice == KEEP_NEW:
-        supersede(conn, partner.id, by_fact_id=fact.id, now=now)
+        for partner in partners:
+            supersede(conn, partner.id, by_fact_id=fact.id, now=now)
         fact = reactivate(conn, fact.id, now=now)
     else:
         fact = retire(conn, fact.id, now=now)
@@ -112,7 +117,7 @@ def resolve(
         stats={
             "resolution": choice,
             "fact_id": fact_id,
-            "partner_id": partner.id,
+            "partner_ids": [partner.id for partner in partners],
         },
         now=now,
     )

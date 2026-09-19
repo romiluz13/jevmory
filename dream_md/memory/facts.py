@@ -132,20 +132,32 @@ def ask_facts(conn: sqlite3.Connection, project: str) -> list[Fact]:
     return [_row_to_fact(row) for row in rows]
 
 
-def contradicts_partner(conn: sqlite3.Connection, fact_id: int) -> Fact | None:
-    """The fact this one contradicts (oldest ``contradicts`` link), or None.
+def contradicts_partners(
+    conn: sqlite3.Connection, fact_id: int
+) -> list[Fact]:
+    """All facts this one contradicts (``contradicts`` links, oldest first).
 
-    Ask facts created by the dream engine carry exactly one such link to
-    the incumbent fact; the writer and ``resolve`` use it to render the
-    "new vs old" question and to apply resolutions.
+    A fact can carry several such links: the dream engine keeps the
+    contradicts edge for every over-gate pair (review S2), not just the
+    pair whose action won. ``resolve`` acts on ALL of them.
     """
-    row = conn.execute(
+    rows = conn.execute(
         "SELECT related_id FROM fact_links "
         "WHERE fact_id = ? AND relation = 'contradicts' "
-        "ORDER BY rowid LIMIT 1",
+        "ORDER BY rowid",
         (fact_id,),
-    ).fetchone()
-    return get_fact(conn, row[0]) if row else None
+    ).fetchall()
+    return [get_fact(conn, row[0]) for row in rows]
+
+
+def contradicts_partner(conn: sqlite3.Connection, fact_id: int) -> Fact | None:
+    """The oldest ``contradicts`` partner, or None (display helper).
+
+    The writer's "new vs old" question line shows this one; resolution
+    semantics use ``contradicts_partners`` (all of them).
+    """
+    partners = contradicts_partners(conn, fact_id)
+    return partners[0] if partners else None
 
 
 # --- receipts (judgments + runs) ----------------------------------------------

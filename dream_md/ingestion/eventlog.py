@@ -73,6 +73,20 @@ def event_id(text: str, session_id: str | None) -> str:
     return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
 
+def default_home() -> Path:
+    """Root for dream-md state. ``$DREAM_MD_HOME`` wins over ``Path.home()``.
+
+    One override for every state path (stores, opt-in markers, hook
+    logs, scan roots) — tests and sandboxes redirect everything with a
+    single env var; agent-owned config files (``~/.claude/settings.json``,
+    ``~/.codex/config.toml``) are NOT dream-md state and always use the
+    real home.
+    """
+
+    override = os.environ.get("DREAM_MD_HOME")
+    return Path(override) if override else Path.home()
+
+
 def project_slug(project_dir: str | os.PathLike[str]) -> str:
     """Per-project store slug: sha1 of the REAL project path, short.
 
@@ -87,7 +101,7 @@ def store_path(
     project_dir: str | os.PathLike[str], home: str | os.PathLike[str] | None = None
 ) -> Path:
     """SQLite store path for a project (PLAN: ~/.dream-md/projects/<slug>.db)."""
-    base = Path(home) if home is not None else Path.home()
+    base = Path(home) if home is not None else default_home()
     return base / ".dream-md" / "projects" / f"{project_slug(project_dir)}.db"
 
 
@@ -101,7 +115,7 @@ def optin_path(
     created by ``dream-md init --enable-grading``. No marker -> the
     dream engine refuses to grade and candidates stay queued.
     """
-    base = Path(home) if home is not None else Path.home()
+    base = Path(home) if home is not None else default_home()
     return base / ".dream-md" / "projects" / f"{project_slug(project_dir)}.optin"
 
 
