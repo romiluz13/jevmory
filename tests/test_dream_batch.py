@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import unittest
 
-from dream_md.dream.batch import PairPlan, plan_phase_b
-from dream_md.ingestion.extract import Candidate
-from dream_md.judgment.batch import BatchError
-from dream_md.thresholds import BATCH_TOKEN_BUDGET
+from jev_md.dream.batch import PairPlan, plan_phase_b
+from jev_md.ingestion.extract import Candidate
+from jev_md.judgment.batch import BatchError
+from jev_md.thresholds import BATCH_TOKEN_BUDGET
 
 
 def make_candidate(i, text="candidate claim about deploying on fridays"):

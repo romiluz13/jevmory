@@ -2,7 +2,7 @@
 
 ``demo/run_demo.py`` must ALWAYS produce one stale line, one wrong
 line, one unsupported line with receipts — offline, deterministic,
-never touching the real ``~/.dream-md``. These tests pin that promise;
+never touching the real ``~/.jev-md``. These tests pin that promise;
 if someone edits the fixture or the demo asker and breaks it, this
 file is the tripwire.
 """
@@ -134,7 +134,7 @@ class PlantedJevTest(unittest.TestCase):
 
 
 def _phase_c_triple(i):
-    from dream_md.audit.questions import phase_c_triple
+    from jev_md.audit.questions import phase_c_triple
 
     return phase_c_triple(i)
 
@@ -154,7 +154,7 @@ class DemoCommandTest(unittest.TestCase):
         self.assertIn("1 stale line, 1 wrong line", result.stdout)
         # T7: the printed "live equivalent" must be the complete 3-step
         # sequence — copy-paste hits the opt-in gate without init
-        self.assertIn("dream-md init --enable-grading", result.stdout)
+        self.assertIn("jev-md init --enable-grading", result.stdout)
         self.assertIn("receipts: run ", result.stdout)
 
 

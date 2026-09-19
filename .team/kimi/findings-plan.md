@@ -1,7 +1,7 @@
 # Findings — PLAN attack (Kimi, devil's advocate)
 
 Reviewer: Kimi. Scope: `.team/MISSION.md`, `docs/PLAN.md`, `docs/DOMAIN.md`,
-`docs/reference/typesafe-api.md`, `.ddd/notes/dream-md.md`. Read-only review.
+`docs/reference/typesafe-api.md`, `.ddd/notes/jev-md.md`. Read-only review.
 
 **Verdict up top:** the plan is buildable and the Jev integration is unusually
 well-grounded (the API reference is real, the fan-out pattern matches the docs).
@@ -23,7 +23,7 @@ product or the demo materially · **[MINOR]** fix-it-now-cheap, hurts later.
 standalone sentence. "that breaks the lockfile", "let's just use bun for this",
 "the auth middleware fix worked" — all durable, all meaningless without the
 preceding exchange. The durable Noul ("judge only what the quote itself
-states") will correctly reject these, which means dream.md captures only the
+states") will correctly reject these, which means jev.md captures only the
 minority of knowledge that happened to be phrased as an aphorism. The flagship
 example ("always use `uv run` in this repo, plain python breaks the lockfile")
 is suspiciously well-formed; real transcripts yield "no not that one, the other
@@ -35,7 +35,7 @@ surrounding 1–2 exchange pairs as a verbatim `context` field on the receipt,
 surfaced via `--verbose` or in audit reports; (b) bias extraction toward
 user-role statements (users state decisions; assistants narrate); (c) treat
 assistant quotes as durable candidates only when the user confirms in-session.
-dream.md stays verbatim; receipts get context.
+jev.md stays verbatim; receipts get context.
 
 ### [MAJOR] F1.2 — 600-char chunking manufactures false claims
 
@@ -53,13 +53,13 @@ testable, cheap.
 ### [MINOR] F1.3 — The invariant is the differentiator; instrument it, don't assume it
 
 **Rationale.** Verbatim-only is defensible as *auditable* memory, but the plan
-never states the metric that proves it isn't just noisier memory. If dream.md
+never states the metric that proves it isn't just noisier memory. If jev.md
 can't beat MEMORY.md on "wrong things it tells the agent", this is a science
 project.
 
 **Alternative.** The demo fixture must include a planted memory error that
-dream.md avoids by construction (quote + confidence + ask section). Add
-`dream-md stats`: facts by category, % with support ≥2, open asks. If the tool
+jev.md avoids by construction (quote + confidence + ask section). Add
+`jev-md stats`: facts by category, % with support ≥2, open asks. If the tool
 can't show its own precision, reviewers assume it has none.
 
 ---
@@ -119,7 +119,7 @@ branch, matches the documented pattern.
 (Noul — *no* confidence field, per the API reference; distance-from-0.5 is our
 proxy), category (Choice — has confidence), significance (Score — has
 confidence). DOMAIN.md defines Confidence as the Noul distance, but the PLAN's
-dream.md example shows "confidence 0.91", which implies a ×2 normalization
+jev.md example shows "confidence 0.91", which implies a ×2 normalization
 (|0.955−0.5|×2) that appears nowhere in any doc. Which signal lands in
 `facts.confidence`? Unspecified. The decision rules then mix raw nouls
 (same_claim ≥ 0.8, contradiction ≥ 0.6) with Choice confidences (new_overrides
@@ -142,7 +142,7 @@ features include an offline queue and an "ask" section, silently dropping
 uncertain input is an unforced omission.
 
 **Alternative.** Keep the gate; record `dropped_low_durable` in `runs.stats`
-and surface "N near-miss candidates" in `dream-md status`. No new UX.
+and surface "N near-miss candidates" in `jev-md status`. No new UX.
 
 ### [MINOR] F3.3 — Thresholds are priors, not measurements
 
@@ -166,7 +166,7 @@ workflow, nobody repeats it, re-support stops, confidence decays, and the fact
 drifts toward the ask section. Absence of mention is not evidence of staleness
 — session topics drive mentions; truth doesn't. And since `retire` requires
 contradiction ≥0.8, decay never actually retires anything; it only re-sorts
-dream.md and generates spurious asks. So it adds noise to the one section
+jev.md and generates spurious asks. So it adds noise to the one section
 ("questions for you") that must stay high-precision to demo well. A
 hand-rolled linear decay also hands reviewers an easy "where did this formula
 come from?" attack on a product whose pitch is calibration.
@@ -195,8 +195,8 @@ state it" is disclosure, not consent. For a tool whose entire pitch is trust,
 one "it uploaded my client's session" screenshot ends the launch.
 
 **Alternative.** (a) Hooks ingest locally, always. Grading requires a
-per-project marker (`~/.dream-md/projects/<slug>.optin`) created by
-`dream-md init --enable-grading`; no marker → candidates queue, `status` says
+per-project marker (`~/.jev-md/projects/<slug>.optin`) created by
+`jev-md init --enable-grading`; no marker → candidates queue, `status` says
 so. (b) `install` prints exactly this behavior. (c) README privacy section:
 what leaves (candidate quotes ≤600 chars, never whole transcripts), when (only
 during dream/audit with `TYPESAFE_API_KEY` set *and* project opted in), how to
@@ -215,15 +215,15 @@ post-mortem writes itself.
 `sk-*`, `AKIA*`, `gh[ps]_*`, JWTs (`eyJ…`), `-----BEGIN`, `password=…`, plus a
 high-entropy token heuristic. This becomes a feature: "redaction at rest".
 
-### [MAJOR] F5.3 — dream.md at project root will be committed, leaking verbatim private quotes into git
+### [MAJOR] F5.3 — jev.md at project root will be committed, leaking verbatim private quotes into git
 
 **Rationale.** Facts are verbatim human quotes — frustration, names, client
 mentions. The file sits at project root; the default behavior of every
 developer is to commit new files. The plan says nothing about .gitignore.
 
-**Alternative.** Quickstart step: add `dream.md` to .gitignore (or commit
-deliberately — shared team memory is a real use); `dream-md dream` prints a
-one-time hint when dream.md is untracked and not ignored.
+**Alternative.** Quickstart step: add `jev.md` to .gitignore (or commit
+deliberately — shared team memory is a real use); `jev-md dream` prints a
+one-time hint when jev.md is untracked and not ignored.
 
 ---
 
@@ -236,12 +236,12 @@ is nearly free — worst case is noise on exit. The dangerous modes: (a) the
 hook's environment PATH lacks python3 → command not found, logged nowhere the
 user looks; (b) the parser crashes on a real transcript shape (payload shape is
 still unverified per the DDD note!) → ingest dies every single time; (c) the
-user believes they have memory; dream.md never updates. Silent death for weeks.
+user believes they have memory; jev.md never updates. Silent death for weeks.
 
 **Alternative.** Ingest wrapped in a top-level `try/except Exception → log →
 exit(0)` — always exit 0. `install` emits a verify one-liner
-(`echo '{"session_id":"t","transcript_path":"…"}' | dream-md ingest --test`).
-`dream-md status` shows last ingest timestamp + last error; `dream` warns when
+(`echo '{"session_id":"t","transcript_path":"…"}' | jev-md ingest --test`).
+`jev-md status` shows last ingest timestamp + last error; `dream` warns when
 pending events exist but the last ingest failed.
 
 ### [MAJOR] F6.2 — Concurrent ingests vs SQLite: no WAL, no busy_timeout anywhere in the plan
@@ -283,7 +283,7 @@ ids (F7.3) make re-ingesting that line on the next run safe.
 log", but the schema records runs and never the judgments themselves. The raw
 Jev answers — the actual receipts — are discarded; only derived confidence
 survives. A receipts product that throws away its receipts cannot defend a
-single number in dream.md, cannot debug threshold behavior, cannot re-grade
+single number in jev.md, cannot debug threshold behavior, cannot re-grade
 after tuning.
 
 **Alternative.** Add
@@ -293,12 +293,12 @@ with an index on (subject_kind, subject_id). Trivial storage cost.
 ### [MAJOR] F7.2 — The `ask` lifecycle has no exit
 
 **Rationale.** "Questions for you" surfaces low-confidence conflicts — to whom,
-and then what? There is no `dream-md resolve`, no resolutions table, no expiry.
+and then what? There is no `jev-md resolve`, no resolutions table, no expiry.
 Asks accumulate forever; the section becomes noise; and since that section is
 the demo's money shot, unbounded growth directly degrades the artifact.
 
 **Alternative.** Pick one for v1: asks expire after N unresolved dreams (with a
-stat), or a `dream-md resolve <fact_id> --keep-new|--keep-old` command writing
+stat), or a `jev-md resolve <fact_id> --keep-new|--keep-old` command writing
 a resolution row. Do not ship an appendix that only grows.
 
 ### [MINOR] F7.3 — Event id is fragile: sha256(path + line_no)
@@ -329,8 +329,8 @@ provenance), add `UNIQUE(fact_id, related_id, relation)`, include
 
 ### [MAJOR] F8.1 — The viral demo is `audit`, and the plan sequences it as a side quest
 
-**Rationale.** dream.md generation requires setup, transcripts, and opt-in — a
-slow first act for a directory listing. `dream-md audit MEMORY.md` works on a
+**Rationale.** jev.md generation requires setup, transcripts, and opt-in — a
+slow first act for a directory listing. `jev-md audit MEMORY.md` works on a
 file the viewer *already has*, needs no hooks, one command, and produces the
 visceral moment: "your agent's memory contains 3 stale lines and 1 wrong one —
 here are the receipts." Every Claude Code user has a MEMORY.md; almost none
@@ -341,7 +341,7 @@ risks the best demo being the least polished.
 needs only the judgment module + a line parser, not the full memory store.
 30-second script: (1) `audit` a real MEMORY.md, catch a planted stale line
 with its evidence receipt (10s); (2) `dream` on the fixture repo, show
-dream.md with per-line receipts (10s); (3) show the planted contradiction
+jev.md with per-line receipts (10s); (3) show the planted contradiction
 surfaced in "questions for you" (10s). Plant the contradiction in the fixture
 repo on purpose — do not hope one appears.
 
@@ -358,11 +358,11 @@ an actual recorded GIF part of M7's done definition.
 
 ### [MINOR] F8.3 — Name/file collisions and first-run friction
 
-**Rationale.** `dream.md` at project root may collide with a user's existing
+**Rationale.** `jev.md` at project root may collide with a user's existing
 file; the path-slug scheme (sha1 of path) is opaque when debugging hook issues.
 
 **Alternative.** The format's sentinel comment is already specced — use it:
-refuse to overwrite a dream.md that lacks it, unless `--force`. `status`
+refuse to overwrite a jev.md that lacks it, unless `--force`. `status`
 prints all resolved paths.
 
 ---
@@ -370,7 +370,7 @@ prints all resolved paths.
 ## 9. Governance nits (for the lead)
 
 - **[MINOR] Finish-condition conflict.** MISSION bars "API spend beyond smoke
-  tests" but PASS #3 requires "real dream.md generated from real transcripts" —
+  tests" but PASS #3 requires "real jev.md generated from real transcripts" —
   a full Phase A+B run is dozens of requests, not a 3-candidate smoke. Resolve:
   declare the real-transcript dream part of the smoke budget, capped at N
   requests, logged in `runs.stats`.

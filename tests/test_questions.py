@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import unittest
 
-from dream_md.ingestion.extract import Candidate
-from dream_md.judgment.questions import (
+from jev_md.ingestion.extract import Candidate
+from jev_md.judgment.questions import (
     CATEGORY_OPTIONS,
     SIGNIFICANCE_LEVELS,
     VERDICT_OPTIONS,

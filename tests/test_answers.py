@@ -1,7 +1,7 @@
 """Typed-answer parsing tests (docs/reference/typesafe-api.md shapes).
 
 Every example below is the reference's own documented shape; violations
-must raise JevProtocolError because every number in dream.md has to be
+must raise JevProtocolError because every number in jev.md has to be
 reproducible from stored receipts — off-spec answers are surfaced,
 never guessed at.
 """
@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import unittest
 
-from dream_md.judgment.answers import (
+from jev_md.judgment.answers import (
     ChoiceAnswer,
     NoulAnswer,
     ScoreAnswer,
     parse_answer,
 )
-from dream_md.judgment.errors import JevProtocolError
+from jev_md.judgment.errors import JevProtocolError
 
 
 class ParseNoulTest(unittest.TestCase):

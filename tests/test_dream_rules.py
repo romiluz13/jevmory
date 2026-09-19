@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import unittest
 
-from dream_md.dream.rules import (
+from jev_md.dream.rules import (
     ACTION_ASK,
     ACTION_DUPLICATE,
     ACTION_NONE,
@@ -22,10 +22,10 @@ from dream_md.dream.rules import (
     pair_action,
     phase_a_verdict,
 )
-from dream_md.ingestion.extract import Candidate
-from dream_md.ingestion.models import ROLE_ASSISTANT, ROLE_USER
-from dream_md.judgment.answers import ChoiceAnswer, NoulAnswer, ScoreAnswer
-from dream_md.thresholds import (
+from jev_md.ingestion.extract import Candidate
+from jev_md.ingestion.models import ROLE_ASSISTANT, ROLE_USER
+from jev_md.judgment.answers import ChoiceAnswer, NoulAnswer, ScoreAnswer
+from jev_md.thresholds import (
     CONTRADICTION_GATE,
     DURABLE_GATE_ASSISTANT,
     DURABLE_GATE_USER,

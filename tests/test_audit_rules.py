@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import unittest
 
-from dream_md.audit.memfile import MemoryLine
-from dream_md.audit.questions import DISPOSITION_OPTIONS
-from dream_md.audit.rules import (
+from jev_md.audit.memfile import MemoryLine
+from jev_md.audit.questions import DISPOSITION_OPTIONS
+from jev_md.audit.rules import (
     DISPOSITION_KEYWORDS,
     Q_CONTRADICTED,
     Q_DISPOSITION,
@@ -17,8 +17,8 @@ from dream_md.audit.rules import (
     count_dispositions,
     line_verdict,
 )
-from dream_md.judgment.answers import ChoiceAnswer, NoulAnswer
-from dream_md.thresholds import AUDIT_DISPOSITION_GATE
+from jev_md.judgment.answers import ChoiceAnswer, NoulAnswer
+from jev_md.thresholds import AUDIT_DISPOSITION_GATE
 
 
 def line(number=4):

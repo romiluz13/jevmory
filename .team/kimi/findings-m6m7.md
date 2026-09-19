@@ -8,7 +8,7 @@ that would embarrass on a real API call or a public repo.
 Method: full read of the diff (engine, resolve, writer, facts, eventlog,
 thresholds) plus full reads of hook.py, scan.py, cli.py, README.md,
 demo/*, scripts/live_smoke.py; independent run of the test suite; live
-probes against a scratch `$DREAM_MD_HOME` (multi-chunk collision replay,
+probes against a scratch `$JEV_MD_HOME` (multi-chunk collision replay,
 hook pipes, CLI behavior, demo run). No network used anywhere.
 
 ## Part 1 — S-finding verification (all eight landed)
@@ -22,7 +22,7 @@ hook pipes, CLI behavior, demo run). No network used anywhere.
 | S5 unbounded candidate cap | FIXED | `MAX_CANDIDATES_PER_DREAM: int \| None = 50` in thresholds.py (was `None`); engine defaults to it. |
 | S6 "seen in N sessions" lied (counted events) | FIXED | `_sessions_by_fact()` counts DISTINCT session_id per fact (chunked IN queries vs SQLite variable limit, min 1); writer renders "seen in N sessions" when known, honest "seen N times" fallback when the map is absent. |
 | S7 resolve acted on oldest contradicts partner only | FIXED | `resolve()` iterates `contradicts_partners()`; keep-new supersedes EVERY partner; run stats record `partner_ids` (list). |
-| S8 scan.py untracked + broken import | FIXED | `default_home()` with `$DREAM_MD_HOME` override added to eventlog.py; scan.py is tracked in f1ea7bc and imports it. |
+| S8 scan.py untracked + broken import | FIXED | `default_home()` with `$JEV_MD_HOME` override added to eventlog.py; scan.py is tracked in f1ea7bc and imports it. |
 
 No regressions found in any fix. The S1 fix design (representative lists
 popped per batch position) is correct because the planner preserves
@@ -32,7 +32,7 @@ IndexError → caught by the S3 handler → run row closed. Fail-closed, good.
 ## Part 2 — independent verification
 
 - **Test suite: 504 tests, all pass** (`python3 -m unittest discover -s tests -t .`, 1.394s). README's "504 offline tests" claim is exact.
-- **Demo: output is byte-identical to the README's claimed block**, including `receipts: run 1 · 1 api calls · 838 tokens · evidence: 0 facts, 6 statements`. PlantedJev answers through the real strict parser; matching is by substring, not line number; the throwaway home never touches `$DREAM_MD_HOME` (verified while my shell had one exported).
+- **Demo: output is byte-identical to the README's claimed block**, including `receipts: run 1 · 1 api calls · 838 tokens · evidence: 0 facts, 6 statements`. PlantedJev answers through the real strict parser; matching is by substring, not line number; the throwaway home never touches `$JEV_MD_HOME` (verified while my shell had one exported).
 - **Stdlib-only claim verified**: import scan of the whole package — no third-party imports.
 - **Redaction kinds match the README list exactly**: PEM, bearer, `sk-`, AWS `AKIA`/`ASIA`, `gh[pousr]_`, JWT, credential assignments, hex ≥20, base64-ish ≥20-with-digit.
 - **Hook never-die contract holds empirically**: garbage stdin → exit 0 + "skipped" log; missing transcript → exit 0 + logged `ingest_error` (visible via `status`); valid payload → exit 0, 6 events ingested, per-project log written. Redaction at rest confirmed at the storage boundary (`EventLog.append` redacts before INSERT).
@@ -44,12 +44,12 @@ IndexError → caught by the S3 handler → run row closed. Fail-closed, good.
 
 ### T1 (MINOR, docs; highest-visibility item here) — README quickstart commands are wrong
 
-- `dream-md install claude` and `dream-md install codex` (Quickstart) fail:
+- `jev-md install claude` and `jev-md install codex` (Quickstart) fail:
   the parser requires `--agent` (verified: `error: the following arguments
   are required: --agent`, exit 2). The tool's own `init` output prints the
-  correct `dream-md install --agent claude|codex` form — the README
+  correct `jev-md install --agent claude|codex` form — the README
   disagrees with the tool. This is the first command a new user runs.
-- Same block: `dream-md init  # creates the ~/.dream-md/projects/<slug>.db
+- Same block: `jev-md init  # creates the ~/.jev-md/projects/<slug>.db
   store` — init creates nothing (verified: 0 db files after init; the store
   is created lazily by ingest/status/dream). Harmless but wrong.
 
@@ -67,12 +67,12 @@ paths; quotes are verbatim and may contain whatever the conversation
 contained") or add path-scrubbing. The rest of the Privacy section checks
 out exactly (600/800 caps, marker+key double gate, redaction list).
 
-### T3 (MINOR) — `dream-md hook` CLI alias silently drops piped stdin
+### T3 (MINOR) — `jev-md hook` CLI alias silently drops piped stdin
 
 `main()` never reads stdin; `_cmd_hook` passes `stdin_text=None` to
 `run_hook`, which then finds no payload. Empirically: a VALID payload piped
-to `dream-md hook` exits 0 and logs "skipped: no JSON payload" to
-global.jsonl — a silent no-op. Real installs use `python3 -m dream_md.hook`
+to `jev-md hook` exits 0 and logs "skipped: no JSON payload" to
+global.jsonl — a silent no-op. Real installs use `python3 -m jev_md.hook`
 (works correctly, verified), and the alias is hidden from help, so blast
 radius is small — but the alias claims the same contract as the module
 entry and doesn't keep it. Read stdin in `_cmd_hook` or drop the alias.
@@ -106,10 +106,10 @@ closed explicitly.
 ### T7 (NIT, bundle)
 
 - `live_smoke.run_dream_smoke(force=…)` is unreachable from the CLI (no
-  `--force` flag); a foreign dream.md exits 1 with a clean SentinelError
+  `--force` flag); a foreign jev.md exits 1 with a clean SentinelError
   message. Either expose the flag or drop the param.
 - Demo `main()` preamble prints the "live equivalent" as ingest + audit but
-  omits `dream-md init --enable-grading` (the module docstring above it has
+  omits `jev-md init --enable-grading` (the module docstring above it has
   all three steps). Copy-pasting the printed two commands hits the opt-in
   gate.
 - `audit --json --md` both set → `--json` silently wins; make them mutually

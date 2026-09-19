@@ -1,1 +1,1 @@
-"""Test suite for dream-md. Runs offline: no network, no API key."""
+"""Test suite for jev-md. Runs offline: no network, no API key."""

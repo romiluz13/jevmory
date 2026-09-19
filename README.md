@@ -1,14 +1,14 @@
-# dream.md — your coding agent's memory, with receipts
+# jev-md — your coding agent's memory, with receipts
 
 Local, zero-dependency Python CLI. Turns session transcripts into a
-`dream.md` memory file where every fact is a **verbatim quote** graded by
+`jev.md` memory file where every fact is a **verbatim quote** graded by
 [TypeSafe Jev](https://typesafe.ai)'s calibrated confidence, with redaction
 at rest.
 
 The viral one-liner:
 
 ```
-dream-md audit MEMORY.md
+jev-md audit MEMORY.md
 ```
 
 > your agent's memory has 1 stale line, 1 wrong one, and 1 unsupported one;
@@ -17,21 +17,21 @@ dream-md audit MEMORY.md
 ## What it does
 
 Your coding agent (Claude Code, Codex CLI) writes session transcripts to
-disk. dream-md watches, ingests, and grades them:
+disk. jev-md watches, ingests, and grades them:
 
 1. **Hooks ingest locally** — a `SessionEnd` hook (Claude Code) or `notify`
    hook (Codex CLI) streams transcript events into a per-project SQLite
-   store at `~/.dream-md/projects/<slug>.db`. Secrets are redacted at rest,
+   store at `~/.jev-md/projects/<slug>.db`. Secrets are redacted at rest,
    before storage. Hooks always exit 0; they can never break a session.
-2. **`dream-md dream` grades while you sleep** — sentence candidates are
+2. **`jev-md dream` grades while you sleep** — sentence candidates are
    extracted, deduped, and (only with your opt-in) sent to the Jev API for
    calibrated judgment: durability, category, significance, support,
    contradiction. Raw judgments are stored — every fact has receipts.
-3. **`dream-md audit MEMORY.md` checks any memory file** — each line is
+3. **`jev-md audit MEMORY.md` checks any memory file** — each line is
    graded against the evidence in the store and printed as a
    screenshot-shaped report: `STALE / WRONG / UNSUPPORTED / KEEP`, with
    confidence, support, contradiction, and the run receipt.
-4. **`dream.md` lands at your project root** — grouped by category,
+4. **`jev.md` lands at your project root** — grouped by category,
    confidence-ordered, every line a verbatim quote with provenance.
    Sentinel-guarded: never overwritten without your say-so.
 
@@ -43,25 +43,25 @@ Facts are quotes, not summaries — the memory can't hallucinate.
 Requires Python ≥3.10 and nothing else — stdlib only, no pip deps.
 
 ```sh
-git clone https://github.com/you/dream-md && cd dream-md
+git clone https://github.com/you/jev-md && cd jev-md
 
 # in your project:
-dream-md init                     # setup; the store appears on first ingest
-dream-md install --agent claude   # prints the Claude Code SessionEnd hook JSON
-dream-md install --agent codex    # prints the Codex notify snippet (--yes patches config)
+jev-md init                     # setup; the store appears on first ingest
+jev-md install --agent claude   # prints the Claude Code SessionEnd hook JSON
+jev-md install --agent codex    # prints the Codex notify snippet (--yes patches config)
 
 # stay fully local (nothing ever leaves):
-dream-md ingest --scan            # finds this project's transcripts and ingests
-dream-md status                   # queued candidates, last ingest, errors
+jev-md ingest --scan            # finds this project's transcripts and ingests
+jev-md status                   # queued candidates, last ingest, errors
 
 # or opt in to grading (needs $TYPESAFE_API_KEY):
-dream-md init --enable-grading    # per-project opt-in marker
-dream-md dream                    # grade queued candidates
-dream-md audit MEMORY.md          # receipts for every memory line
-dream-md resolve <id>             # answer a contradiction question
+jev-md init --enable-grading    # per-project opt-in marker
+jev-md dream                    # grade queued candidates
+jev-md audit MEMORY.md          # receipts for every memory line
+jev-md resolve <id>             # answer a contradiction question
 ```
 
-Add `dream.md` to your project's `.gitignore` if you don't want agent
+Add `jev.md` to your project's `.gitignore` if you don't want agent
 memory in version control — it's yours, not the repo's.
 
 Fully offline? Just never run `init --enable-grading`. Everything else —
@@ -79,7 +79,7 @@ planted errors (stale, wrong, unsupported) contradicted by the evidence in
 guaranteed present and the demo costs nothing:
 
 ```
-dream-md audit — demo/MEMORY.md
+jev-md audit — demo/MEMORY.md
 your memory has 1 stale line, 1 wrong line, 1 unsupported line; 2 keep
 
 LINE  VERDICT      CONF  SUPP  CONTRA  CLAIM
@@ -90,7 +90,7 @@ LINE  VERDICT      CONF  SUPP  CONTRA  CLAIM
 receipts: run 1 · 1 api calls · 838 tokens · evidence: 0 facts, 6 statements
 ```
 
-The live `dream-md audit` produces exactly this shape, with real Jev
+The live `jev-md audit` produces exactly this shape, with real Jev
 judgments behind the numbers.
 
 ## Privacy
@@ -98,7 +98,7 @@ judgments behind the numbers.
 - **What leaves:** redacted candidate quotes (≤600 chars) + verbatim
   context (≤800 chars) + minimal project context — only during
   `dream`/`audit` with `$TYPESAFE_API_KEY`
-  set **and** the project opted in (`dream-md init --enable-grading`).
+  set **and** the project opted in (`jev-md init --enable-grading`).
 - **Never:** whole transcripts, transcript metadata (the project context
   is just the project name — no file paths), or secrets (redacted at
   rest, before any storage — `sk-*`, AWS keys, GitHub tokens, JWTs, PEM
@@ -110,7 +110,7 @@ judgments behind the numbers.
   stays inside the quote that leaves. The redactor scrubs secrets, not
   paths; if that matters for your project, stay in local mode.
 - **Fully local mode:** `--offline` / no key / no opt-in — events queue,
-  nothing leaves. No marker → candidates queue; `dream-md status` says so.
+  nothing leaves. No marker → candidates queue; `jev-md status` says so.
 
 ## Design decisions (non-negotiable)
 
@@ -123,7 +123,7 @@ judgments behind the numbers.
    requires an explicit per-project opt-in marker; redaction at rest
    before any storage.
 5. **Hooks never break sessions and never die silently.** Ingest is
-   synchronous, always exits 0, and errors surface in `dream-md status`.
+   synchronous, always exits 0, and errors surface in `jev-md status`.
 6. **Receipts for everything.** Raw judgments and usage are stored —
    `runs`/`judgments` tables — so any number in the report can be
    traced to the API call that produced it.

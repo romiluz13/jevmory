@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from dream_md.memory.schema import (
+from jev_md.memory.schema import (
     SCHEMA_VERSION,
     SchemaVersionError,
     connect,
@@ -153,7 +153,7 @@ class LegacyV1StoreTest(unittest.TestCase):
     def test_v1_events_table_kept_as_is_documented_tolerance(self):
         # The v1 events table stays untouched (SQLite cannot ALTER the
         # nullability); NULL text stays insertable in a migrated v1 store.
-        # Documented tolerance: all dream.md writes always supply text.
+        # Documented tolerance: all jev.md writes always supply text.
         self._make_v1_store()
         conn = connect(self.db)
         self.addCleanup(conn.close)
@@ -184,14 +184,14 @@ class DdlCentralizationTest(unittest.TestCase):
 
     def test_eventlog_owns_no_ddl(self):
         # R7: every CREATE TABLE / CREATE VIRTUAL TABLE / CREATE INDEX for
-        # the store lives in dream_md.memory.schema — nowhere else.
-        source = (self.ROOT / "dream_md" / "ingestion" / "eventlog.py").read_text()
+        # the store lives in jev_md.memory.schema — nowhere else.
+        source = (self.ROOT / "jev_md" / "ingestion" / "eventlog.py").read_text()
         self.assertNotIn("CREATE TABLE", source)
         self.assertNotIn("CREATE VIRTUAL TABLE", source)
         self.assertNotIn("CREATE INDEX", source)
 
     def test_schema_module_is_the_ddl_home(self):
-        source = (self.ROOT / "dream_md" / "memory" / "schema.py").read_text()
+        source = (self.ROOT / "jev_md" / "memory" / "schema.py").read_text()
         for table in REQUIRED_TABLES - {"facts_fts"}:
             self.assertIn(f"CREATE TABLE IF NOT EXISTS {table} ", source)
         self.assertIn("CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts", source)

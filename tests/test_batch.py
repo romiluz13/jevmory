@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import unittest
 
-from dream_md.ingestion.extract import Candidate
-from dream_md.judgment.batch import BatchError, plan_phase_a
-from dream_md.judgment.questions import phase_a_questions, phase_a_state
-from dream_md.judgment.tokens import estimate_tokens
-from dream_md.thresholds import BATCH_TOKEN_BUDGET
+from jev_md.ingestion.extract import Candidate
+from jev_md.judgment.batch import BatchError, plan_phase_a
+from jev_md.judgment.questions import phase_a_questions, phase_a_state
+from jev_md.judgment.tokens import estimate_tokens
+from jev_md.thresholds import BATCH_TOKEN_BUDGET
 
 
 def candidate(i, text=None, context=None):

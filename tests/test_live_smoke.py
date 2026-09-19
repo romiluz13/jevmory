@@ -31,8 +31,8 @@ live_smoke = importlib.util.module_from_spec(_spec)
 sys.modules["live_smoke"] = live_smoke  # @dataclass needs the module registered
 _spec.loader.exec_module(live_smoke)
 
-from dream_md.judgment.answers import ChoiceAnswer, NoulAnswer, ScoreAnswer
-from dream_md.judgment.errors import JevError
+from jev_md.judgment.answers import ChoiceAnswer, NoulAnswer, ScoreAnswer
+from jev_md.judgment.errors import JevError
 
 
 class ScriptedTransport:
@@ -165,17 +165,17 @@ class DreamSmokeGatesTest(unittest.TestCase):
     """--dream: marker gate BEFORE any request or store trace."""
 
     def setUp(self):
-        self._old_home = os.environ.get("DREAM_MD_HOME")
+        self._old_home = os.environ.get("JEV_MD_HOME")
         self._tmp = TemporaryDirectory()
-        os.environ["DREAM_MD_HOME"] = self._tmp.name
+        os.environ["JEV_MD_HOME"] = self._tmp.name
         self.project = self._tmp.name + "/proj"
         os.makedirs(self.project)
 
     def tearDown(self):
         if self._old_home is None:
-            os.environ.pop("DREAM_MD_HOME", None)
+            os.environ.pop("JEV_MD_HOME", None)
         else:
-            os.environ["DREAM_MD_HOME"] = self._old_home
+            os.environ["JEV_MD_HOME"] = self._old_home
         self._tmp.cleanup()
 
     def test_marker_gate_fires_before_any_egress_or_store(self):
@@ -234,8 +234,8 @@ class MainTest(unittest.TestCase):
         # and plumbs into run_dream_smoke (here: clean marker refusal —
         # no request, no store; the gate fires first as always)
         with TemporaryDirectory() as tmp:
-            old_home = os.environ.get("DREAM_MD_HOME")
-            os.environ["DREAM_MD_HOME"] = tmp
+            old_home = os.environ.get("JEV_MD_HOME")
+            os.environ["JEV_MD_HOME"] = tmp
             os.environ["TYPESAFE_API_KEY"] = "test-key"
             err, out = io.StringIO(), io.StringIO()
             try:
@@ -244,9 +244,9 @@ class MainTest(unittest.TestCase):
             finally:
                 os.environ.pop("TYPESAFE_API_KEY", None)
                 if old_home is None:
-                    os.environ.pop("DREAM_MD_HOME", None)
+                    os.environ.pop("JEV_MD_HOME", None)
                 else:
-                    os.environ["DREAM_MD_HOME"] = old_home
+                    os.environ["JEV_MD_HOME"] = old_home
         self.assertEqual(code, 1)
         self.assertIn("grading is not enabled", err.getvalue())
 

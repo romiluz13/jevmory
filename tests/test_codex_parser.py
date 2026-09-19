@@ -12,7 +12,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from dream_md.ingestion.codex import parse_codex_transcript
+from jev_md.ingestion.codex import parse_codex_transcript
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "codex_session.jsonl"
 SESSION_ID = "11111111-0000-4000-8000-0000000000d1"

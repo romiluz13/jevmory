@@ -1,4 +1,4 @@
-# dream.md — domain model (ubiquitous language)
+# jev.md — domain model (ubiquitous language)
 
 Single bounded context: **Memory Consolidation for coding agents**.
 Everything below is one context; sub-domains are modules, not separate contexts.
@@ -12,26 +12,26 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 | **Statement** | A verbatim text quote extracted from an event. Never rewritten, never generated. "Verbatim" means modulo outer whitespace (leading/trailing trim); the interior is byte-exact. |
 | **Candidate** | A Statement that might deserve to become a Fact. Deterministically extracted, then judged. |
 | **Fact** | An active, graded Statement in the memory store: verbatim claim + verbatim context (surrounding exchanges) + category + significance + confidence + provenance (source event ids) + lifecycle status. |
-| **Judgment** | One typed Jev answer (Noul / Choice / Score) about a state. Judgments are evidence, stored verbatim in the judgments table — every number in dream.md is reproducible from stored receipts. |
+| **Judgment** | One typed Jev answer (Noul / Choice / Score) about a state. Judgments are evidence, stored verbatim in the judgments table — every number in jev.md is reproducible from stored receipts. |
 | **Confidence** | A Fact's confidence is exactly `clamp01(2·|durable_noul − 0.5|)` — the certainty of durability. Choice/Score confidences drive their own rules and are never blended in. One formula, in `thresholds.py`. |
 | **Significance** | How much the Fact matters for future work in this project (Score levels trivial→critical). |
 | **Receipt** | The provenance + confidence record attached to every Fact: "who said it, when, how sure are we." |
-| **Dream** | A consolidation run: grade pending candidates, dedupe against existing Facts, resolve conflicts, retire stale Facts, rewrite `dream.md`. |
+| **Dream** | A consolidation run: grade pending candidates, dedupe against existing Facts, resolve conflicts, retire stale Facts, rewrite `jev.md`. |
 | **Verdict** | The decision for a Fact: `keep`, `supersede`, `retire`, `ask` (low confidence → surface to human). |
 | **Audit** | Grading an *external* memory file (e.g. Claude Code's `MEMORY.md`) line by line: still true / stale / wrong / unsupported, with receipts. |
-| **dream.md** | The published memory file at project root — the only artifact agents read. Facts grouped by category, sorted by significance × confidence, each with a receipt line. |
+| **jev.md** | The published memory file at project root — the only artifact agents read. Facts grouped by category, sorted by significance × confidence, each with a receipt line. |
 | **Hook** | The integration that triggers ingest when an agent session ends (Claude Code `SessionEnd`, Codex `notify`). |
 
 ## Invariants (the domain's laws)
 
-1. **No generation.** dream.md never writes a sentence that wasn't said by a human or
+1. **No generation.** jev.md never writes a sentence that wasn't said by a human or
    agent in a session. Jev judges; code selects and composes. (System One cannot
    generate text — see `docs/reference/typesafe-api.md` constraint 1.)
 2. **Every Fact has a Receipt.** Verbatim claim + source event ids + confidence.
    A fact without provenance is not stored.
 3. **Destructive verdicts need high confidence.** Retiring/superseding a Fact requires
    confidence ≥ 0.8; low-confidence cases get Verdict `ask` and are surfaced in a
-   "questions for you" section of dream.md.
+   "questions for you" section of jev.md.
 4. **Hooks never break sessions, never grade, never die silently.** Ingest is
    synchronous, local-only, wrapped so it always exits 0; failures log where
    `status` shows them. Grading is never in the hook path.
@@ -40,7 +40,7 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 6. **Redaction at rest.** Secrets are scrubbed deterministically at ingest, before
    storage — the local store never holds raw secrets, and nothing unredacted can
    ever leave the machine.
-7. **Grading is opt-in per project.** A marker file created by `dream-md init
+7. **Grading is opt-in per project.** A marker file created by `jev-md init
    --enable-grading` is the only trigger for anything that calls the Jev API.
    No marker → events queue locally, forever if need be.
 8. **No decay in v1.** Absence of mention is not evidence of staleness: confidence
@@ -52,5 +52,5 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 - **ingestion** — session discovery, transcript format parsing (Claude/Codex), Event log, deterministic Statement/Candidate extraction.
 - **judgment** — the Jev client: fan-out batching, budget math, retry/backoff, typed answers, fake client for tests.
 - **memory** — the store: SQLite schema, FTS5 lookup, Fact lifecycle, dedupe/conflict bookkeeping.
-- **dream** — the consolidation engine: the pipeline that composes judgments into verdicts and rewrites dream.md.
+- **dream** — the consolidation engine: the pipeline that composes judgments into verdicts and rewrites jev.md.
 - **integration** — CLI + hooks (Claude Code `SessionEnd`, Codex `notify`) + `install` command.

@@ -12,7 +12,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from dream_md.memory.facts import (
+from jev_md.memory.facts import (
     STATUS_ACTIVE,
     STATUS_ASK,
     STATUS_RETIRED,
@@ -37,8 +37,8 @@ from dream_md.memory.facts import (
     start_run,
     supersede,
 )
-from dream_md.memory.schema import connect, migrate
-from dream_md.thresholds import JACCARD_GATE
+from jev_md.memory.schema import connect, migrate
+from jev_md.thresholds import JACCARD_GATE
 
 T0 = "2026-09-19T00:00:00Z"
 T1 = "2026-09-19T00:01:00Z"

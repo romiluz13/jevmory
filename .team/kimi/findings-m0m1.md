@@ -1,9 +1,9 @@
 # Findings — M0/M1 code review (Kimi)
 
 Scope: commits `4e82091` (M0 skeleton) and `607e3b5` (M1 ingestion) — all code
-under `dream_md/` and `tests/`. Reviewed against PLAN **v2** (`docs/PLAN.md`),
+under `jev_md/` and `tests/`. Reviewed against PLAN **v2** (`docs/PLAN.md`),
 DOMAIN invariants 1–8, and the observed schemas recorded in
-`.ddd/notes/dream-md.md`. Working tree at review time: only lead-authored doc
+`.ddd/notes/jev-md.md`. Working tree at review time: only lead-authored doc
 edits (PLAN v2, DOMAIN, MISSION, DDD note) are uncommitted; the code reviewed
 is exactly the committed code.
 
@@ -67,7 +67,7 @@ combine content-hash with statement index." Walk it through: session 2 repeats
 "always use uv run in this repo…" verbatim → identical content hash →
 `INSERT OR IGNORE` swallows it → no pending event → never re-graded →
 `support_count` never bumps, `last_supported_at` never advances. The
-"seen in 3 sessions" receipt in PLAN v2's own dream.md example becomes
+"seen in 3 sessions" receipt in PLAN v2's own jev.md example becomes
 **impossible for exact verbatim repeats** — the most common way a convention
 re-affirms itself. Statement index fixes uniqueness *within* one file only;
 the same content at index 0 in two different session files still collapses.

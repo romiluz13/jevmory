@@ -7,20 +7,20 @@ import json
 import tempfile
 import unittest
 
-from dream_md.audit.engine import run_audit
-from dream_md.audit.questions import DISPOSITION_OPTIONS
-from dream_md.judgment.errors import JevRetryExhausted
-from dream_md.judgment.fake import FakeJev
-from dream_md.memory.facts import add_fact
-from dream_md.memory.schema import connect, migrate
-from dream_md.thresholds import (
+from jev_md.audit.engine import run_audit
+from jev_md.audit.questions import DISPOSITION_OPTIONS
+from jev_md.judgment.errors import JevRetryExhausted
+from jev_md.judgment.fake import FakeJev
+from jev_md.memory.facts import add_fact
+from jev_md.memory.schema import connect, migrate
+from jev_md.thresholds import (
     AUDIT_EVIDENCE_FACTS,
     AUDIT_EVIDENCE_STATEMENTS,
 )
 
 NOW = "2026-09-19T02:00:00Z"
 
-MEMORY = """# dream.md
+MEMORY = """# jev.md
 
 ## Tooling
 - claim one about tooling
@@ -171,7 +171,7 @@ class AuditEngineTest(unittest.TestCase):
                 },
                 "confidence": confidence,
             }
-        memory = "# dream.md\n" + "\n".join(
+        memory = "# jev.md\n" + "\n".join(
             f"- scripted claim {i}" for i in range(5)
         )
         report = self.run_engine(FakeJev(mode="scripted", answers=scripted),
@@ -191,7 +191,7 @@ class AuditEngineTest(unittest.TestCase):
     def test_structural_only_memory_file_is_zero_spend(self):
         client = FakeJev()
         report = self.run_engine(
-            client, text="# dream.md\n\n## Tooling\n\n| a | b |\n---\n"
+            client, text="# jev.md\n\n## Tooling\n\n| a | b |\n---\n"
         )
         self.assertEqual(report.lines, ())
         self.assertEqual(report.api_calls, 0)
@@ -237,7 +237,7 @@ class AuditEngineTest(unittest.TestCase):
 
     def test_positions_reset_per_batch_across_batches(self):
         # long claims force ~2 lines per batch at the default budget
-        text = "# dream.md\n" + "\n".join(
+        text = "# jev.md\n" + "\n".join(
             "- " + "y" * 44000 for _ in range(10)
         )
         scripted = {}

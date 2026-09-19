@@ -1,11 +1,11 @@
 """CLI integration tests (M6): every verb, offline, against tmp stores.
 
-`main(argv, stdin_text)` is driven in-process with DREAM_MD_HOME
+`main(argv, stdin_text)` is driven in-process with JEV_MD_HOME
 redirected to a temp dir, so nothing touches the real home and no
 test ever needs the network: live paths are exercised only up to
 their gates (marker, key), which fail before any request is made.
 
-The one part of the CLI that writes OUTSIDE dream-md state —
+The one part of the CLI that writes OUTSIDE jev-md state —
 `install --yes` patching ~/.claude/settings.json or ~/.codex/config.toml
 — is tested at the function level with the target paths patched to
 temp files; the real agent configs are never touched.
@@ -22,15 +22,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from dream_md.cli import (
+from jev_md.cli import (
     _patch_claude_settings,
     _patch_codex_config,
     main,
 )
-from dream_md.dream.writer import SENTINEL_CORE
-from dream_md.ingestion.eventlog import project_slug, store_path
-from dream_md.memory.facts import add_fact, add_link, mark_ask
-from dream_md.memory.schema import connect, migrate
+from jev_md.dream.writer import SENTINEL_CORE
+from jev_md.ingestion.eventlog import project_slug, store_path
+from jev_md.memory.facts import add_fact, add_link, mark_ask
+from jev_md.memory.schema import connect, migrate
 
 CLAUDE_SID = "00000000-0000-4000-8000-0000000000c1"
 CODEX_SID = "11111111-0000-4000-8000-0000000000d1"
@@ -77,13 +77,13 @@ class CliTest(unittest.TestCase):
         self.transcript = write_claude_transcript(
             self.home / "t" / "session.jsonl", str(self.project)
         )
-        # Redirect every dream-md state path into the tmp home, and keep
+        # Redirect every jev-md state path into the tmp home, and keep
         # the live API gate deterministically closed unless a test opens it.
         self._env = {
             name: os.environ.get(name)
-            for name in ("DREAM_MD_HOME", "TYPESAFE_API_KEY")
+            for name in ("JEV_MD_HOME", "TYPESAFE_API_KEY")
         }
-        os.environ["DREAM_MD_HOME"] = str(self.home)
+        os.environ["JEV_MD_HOME"] = str(self.home)
         os.environ.pop("TYPESAFE_API_KEY", None)
 
     def tearDown(self):
@@ -132,7 +132,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn(str(self.store), out)
         self.assertIn("grading:  off", out)
-        self.assertIn("dream-md init --enable-grading", out)
+        self.assertIn("jev-md init --enable-grading", out)
         self.assertFalse(self.store.exists())  # prints only
 
     def test_init_enable_grading_creates_the_marker(self):
@@ -142,7 +142,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("marker:   ", out)
         self.assertIn("(created)", out)
-        marker = self.home / ".dream-md" / "projects" / f"{self.slug}.optin"
+        marker = self.home / ".jev-md" / "projects" / f"{self.slug}.optin"
         self.assertTrue(marker.exists())
         # a second init now reports the marker it finds
         rc, out, err = self.run_cli(["init", "--project", str(self.project)])
@@ -247,7 +247,7 @@ class CliTest(unittest.TestCase):
         self.assertIn("payload: OK (JSON object)", out)
         self.assertIn("transcript: OK (claude)", out)
         self.assertIn("writes:      none", out)
-        self.assertIsNone(next(self.home.rglob(".dream-md"), None))
+        self.assertIsNone(next(self.home.rglob(".jev-md"), None))
 
     def test_ingest_test_rejects_non_json_stdin(self):
         rc, out, err = self.run_cli(["ingest", "--test"], stdin_text="junk")
@@ -269,7 +269,7 @@ class CliTest(unittest.TestCase):
         )
         self.assertEqual(rc, 0)
         self.assertIn("transcript: OK (claude)", out)
-        self.assertIsNone(next(self.home.rglob(".dream-md"), None))
+        self.assertIsNone(next(self.home.rglob(".jev-md"), None))
 
     # --- dream -----------------------------------------------------------------
 
@@ -290,7 +290,7 @@ class CliTest(unittest.TestCase):
         self.assertIn("candidates:   1 groups", out)
         self.assertIn("facts:        1 added", out)
         self.assertEqual(self.facts_with_status("active"), [1])
-        artifact = self.project / "dream.md"
+        artifact = self.project / "jev.md"
         self.assertTrue(artifact.exists())
         self.assertIn(SENTINEL_CORE, artifact.read_text(encoding="utf-8"))
 
@@ -312,7 +312,7 @@ class CliTest(unittest.TestCase):
         rc, out, err = self.run_cli(["dream", "--project", str(self.project)])
         self.assertEqual(rc, 1)
         self.assertIn("grading is off for this project", err)
-        self.assertIn("dream-md init --enable-grading", err)
+        self.assertIn("jev-md init --enable-grading", err)
         self.assertEqual(self.facts_with_status("active"), [])
 
     def test_dream_live_with_marker_but_no_key_fails_with_the_hint(self):
@@ -323,10 +323,10 @@ class CliTest(unittest.TestCase):
         self.assertIn("$TYPESAFE_API_KEY is not set", err)
         self.assertEqual(self.facts_with_status("active"), [])
 
-    def test_dream_refuses_a_foreign_dream_md_without_force(self):
+    def test_dream_refuses_a_foreign_jev_md_without_force(self):
         self._ingested()
-        artifact = self.project / "dream.md"
-        artifact.write_text("# my personal notes, not dream-md's\n", encoding="utf-8")
+        artifact = self.project / "jev.md"
+        artifact.write_text("# my personal notes, not jev-md's\n", encoding="utf-8")
         rc, out, err = self.run_cli(
             ["dream", "--offline", "--project", str(self.project)]
         )
@@ -409,7 +409,7 @@ class CliTest(unittest.TestCase):
         rc, out, err = self.run_cli(["status", "--project", str(self.project)])
         self.assertEqual(rc, 0)
         self.assertIn("events:       none yet (no store)", out)
-        self.assertIn("first step:   dream-md ingest --scan", out)
+        self.assertIn("first step:   jev-md ingest --scan", out)
         self.assertIn("grading is off for this project", out)
 
     def test_status_reports_store_runs_and_asks(self):
@@ -422,7 +422,7 @@ class CliTest(unittest.TestCase):
         self.assertIn("facts:", out)
         self.assertIn("last run:     dream", out)
         self.assertIn(f"open ask:     #{ask_id}", out)
-        self.assertIn("dream.md:     ", out)
+        self.assertIn("jev.md:     ", out)
         self.assertIn("grading:      off", out)
         self.assertIn("privacy:", out)
 
@@ -486,7 +486,7 @@ class CliTest(unittest.TestCase):
             ["audit", str(memory), "--offline", "--project", str(self.project)]
         )
         self.assertEqual(rc, 0)
-        self.assertIn("dream-md audit — ", out)
+        self.assertIn("jev-md audit — ", out)
         self.assertIn("receipts:", out)
 
     def test_audit_offline_json_is_machine_readable(self):
@@ -514,7 +514,7 @@ class CliTest(unittest.TestCase):
              "--project", str(self.project)]
         )
         self.assertEqual(rc, 0)
-        self.assertIn("# dream-md audit —", out)
+        self.assertIn("# jev-md audit —", out)
         self.assertIn("| line |", out)
 
     def test_audit_missing_memory_file_fails_cleanly(self):
@@ -567,7 +567,7 @@ class InstallPatchTest(unittest.TestCase):
         self._tmp.cleanup()
 
     def patched(self, name: str, target: Path):
-        return mock.patch(f"dream_md.cli.{name}", return_value=target)
+        return mock.patch(f"jev_md.cli.{name}", return_value=target)
 
     # --- claude ---------------------------------------------------------------
 
@@ -578,7 +578,7 @@ class InstallPatchTest(unittest.TestCase):
         self.assertEqual(rc, 0)
         data = json.loads(target.read_text(encoding="utf-8"))
         command = data["hooks"]["SessionEnd"][0]["hooks"][0]["command"]
-        self.assertEqual(command, "python3 -m dream_md.hook")
+        self.assertEqual(command, "python3 -m jev_md.hook")
 
     def test_patch_claude_settings_merges_with_existing_hooks(self):
         target = self.base / "settings.json"
@@ -626,7 +626,7 @@ class InstallPatchTest(unittest.TestCase):
             rc = _patch_codex_config()
         self.assertEqual(rc, 0)
         text = target.read_text(encoding="utf-8")
-        self.assertIn('notify = ["python3", "-m", "dream_md.hook", "turn-ended"]', text)
+        self.assertIn('notify = ["python3", "-m", "jev_md.hook", "turn-ended"]', text)
         self.assertIn("[features]", text)
         self.assertIn("hooks = true", text)
 
@@ -659,7 +659,7 @@ class InstallPatchTest(unittest.TestCase):
             rc = _patch_codex_config()
         self.assertEqual(rc, 0)
         text = target.read_text(encoding="utf-8")
-        self.assertIn("dream_md.hook", text)
+        self.assertIn("jev_md.hook", text)
         self.assertNotIn("something", text)
 
     def test_patch_codex_never_rewrites_a_section_scoped_notify(self):

@@ -4,13 +4,13 @@
 
 What happens, offline and deterministic:
 
-1. a throwaway store is created in a temp dir (``$DREAM_MD_HOME`` is
+1. a throwaway store is created in a temp dir (``$JEV_MD_HOME`` is
    NOT touched — your real stores and markers stay exactly as they are);
 2. ``demo/transcript.jsonl`` (a synthetic Claude session) is ingested
    into it — six statements of evidence, redacted at rest like always;
 3. ``demo/MEMORY.md`` (five lines, three planted errors) is audited
    against that evidence and the terminal report is printed — the same
-   renderer ``dream-md audit`` uses.
+   renderer ``jev-md audit`` uses.
 
 The asker is ``PlantedJev`` below: a deterministic, offline stand-in
 whose judgments are pinned to the planted lines (matched by substring,
@@ -19,9 +19,9 @@ wrong line, and one unsupported line, with receipts. It exists so the
 report shape is demonstrable anywhere, any time, zero-cost. Real runs
 grade with the real Jev API:
 
-    dream-md init --enable-grading
-    dream-md ingest --transcript demo/transcript.jsonl --project demo
-    dream-md audit demo/MEMORY.md --project demo
+    jev-md init --enable-grading
+    jev-md ingest --transcript demo/transcript.jsonl --project demo
+    jev-md audit demo/MEMORY.md --project demo
 
 Exit code 0 always (it is a demo; failure means the fixture broke, and
 the test suite pins that it does not).
@@ -36,22 +36,22 @@ from pathlib import Path
 from typing import Any, Mapping
 
 # Runnable straight from a source checkout (python3 demo/run_demo.py)
-# without installing: the repo root shadows any installed dream_md so
+# without installing: the repo root shadows any installed jev_md so
 # the demo always exercises the tree it ships with.
 _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from dream_md.audit.engine import run_audit
-from dream_md.audit.questions import DISPOSITION_OPTIONS
-from dream_md.audit.report import render_terminal
-from dream_md.ingestion.claude import parse_claude_transcript
-from dream_md.ingestion.eventlog import EventLog, project_slug, store_path
-from dream_md.judgment.answers import parse_answer
-from dream_md.judgment.client import DEFAULT_MODEL, JevResponse, Usage
-from dream_md.judgment.errors import JevProtocolError
-from dream_md.judgment.questions import Question
-from dream_md.memory.schema import connect, migrate
+from jev_md.audit.engine import run_audit
+from jev_md.audit.questions import DISPOSITION_OPTIONS
+from jev_md.audit.report import render_terminal
+from jev_md.ingestion.claude import parse_claude_transcript
+from jev_md.ingestion.eventlog import EventLog, project_slug, store_path
+from jev_md.judgment.answers import parse_answer
+from jev_md.judgment.client import DEFAULT_MODEL, JevResponse, Usage
+from jev_md.judgment.errors import JevProtocolError
+from jev_md.judgment.questions import Question
+from jev_md.memory.schema import connect, migrate
 
 DEMO_DIR = Path(__file__).resolve().parent
 MEMORY_FILE = DEMO_DIR / "MEMORY.md"
@@ -144,7 +144,7 @@ def build_demo_report(home: Path | None = None) -> str:
     """
     cleanup = home is None
     if home is None:
-        home = Path(tempfile.mkdtemp(prefix="dream-md-demo-"))
+        home = Path(tempfile.mkdtemp(prefix="jev-md-demo-"))
     try:
         parsed = parse_claude_transcript(str(TRANSCRIPT))
         EventLog.for_project(DEMO_DIR, home=home).append(parsed)
@@ -174,19 +174,19 @@ def _rmtree(path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    print("dream-md planted-error demo — deterministic, offline, zero cost")
+    print("jev-md planted-error demo — deterministic, offline, zero cost")
     print()
     print("fixture:   demo/MEMORY.md (5 memory lines, 3 planted errors)")
     print("evidence:  demo/transcript.jsonl (6 statements, ingested into a")
-    print("           throwaway store in a temp dir; your ~/.dream-md is")
+    print("           throwaway store in a temp dir; your ~/.jev-md is")
     print("           never touched)")
     print("grading:   simulated — judgments pinned to the planted lines so")
     print("           the errors are guaranteed present. Live equivalent,")
     print("           same report shape:")
     print()
-    print("  dream-md init --enable-grading")
-    print("  dream-md ingest --transcript demo/transcript.jsonl --project demo")
-    print("  dream-md audit demo/MEMORY.md --project demo")
+    print("  jev-md init --enable-grading")
+    print("  jev-md ingest --transcript demo/transcript.jsonl --project demo")
+    print("  jev-md audit demo/MEMORY.md --project demo")
     print()
     print(build_demo_report())
     return 0

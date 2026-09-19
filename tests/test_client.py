@@ -13,15 +13,15 @@ import unittest
 import urllib.error
 from email.message import Message
 
-from dream_md.judgment.client import DEFAULT_ENDPOINT, JevClient
-from dream_md.judgment.errors import (
+from jev_md.judgment.client import DEFAULT_ENDPOINT, JevClient
+from jev_md.judgment.errors import (
     JevAuthError,
     JevProtocolError,
     JevRetryExhausted,
     JevTransportError,
     JevValidationError,
 )
-from dream_md.judgment.questions import phase_a_questions, phase_a_state
+from jev_md.judgment.questions import phase_a_questions, phase_a_state
 
 
 class RecordingTransport:

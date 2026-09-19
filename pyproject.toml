@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dream-md"
+name = "jev-md"
 version = "0.1.0"
 description = "Coding-agent memory where every fact is a verbatim quote graded by calibrated confidence."
 readme = "README.md"
@@ -37,10 +37,10 @@ classifiers = [
 # setuptools above is build-time only, used for the console entry point.
 
 [project.urls]
-Homepage = "https://github.com/you/dream-md"
+Homepage = "https://github.com/you/jev-md"
 
 [project.scripts]
-dream-md = "dream_md.cli:main"
+jev-md = "jev_md.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["dream_md*"]
+include = ["jev_md*"]

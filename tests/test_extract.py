@@ -6,16 +6,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from dream_md.ingestion.claude import parse_claude_transcript
-from dream_md.ingestion.eventlog import EventLog, event_id
-from dream_md.ingestion.extract import (
+from jev_md.ingestion.claude import parse_claude_transcript
+from jev_md.ingestion.eventlog import EventLog, event_id
+from jev_md.ingestion.extract import (
     candidates_from_statements,
     chunk_text,
     extract_candidates,
 )
-from dream_md.ingestion.models import ParsedTranscript, Statement
-from dream_md.ingestion.redact import redact
-from dream_md.thresholds import (
+from jev_md.ingestion.models import ParsedTranscript, Statement
+from jev_md.ingestion.redact import redact
+from jev_md.thresholds import (
     CHUNK_MAX_CHARS,
     CONTEXT_MAX_CHARS,
     MIN_CANDIDATE_CHARS,

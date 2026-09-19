@@ -9,17 +9,17 @@ import threading
 import unittest
 from pathlib import Path
 
-from dream_md.ingestion.claude import parse_claude_transcript
-from dream_md.ingestion.codex import parse_codex_transcript
-from dream_md.ingestion.eventlog import (
+from jev_md.ingestion.claude import parse_claude_transcript
+from jev_md.ingestion.codex import parse_codex_transcript
+from jev_md.ingestion.eventlog import (
     EventLog,
     event_id,
     normalize_content,
     project_slug,
     store_path,
 )
-from dream_md.ingestion.models import ParsedTranscript, Statement
-from dream_md.ingestion.redact import redact
+from jev_md.ingestion.models import ParsedTranscript, Statement
+from jev_md.ingestion.redact import redact
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 CLAUDE_SID = "00000000-0000-4000-8000-0000000000c1"
@@ -243,7 +243,7 @@ class StorePathTest(unittest.TestCase):
         self.assertEqual(
             path,
             Path(self.home)
-            / ".dream-md"
+            / ".jev-md"
             / "projects"
             / f"{project_slug('/Users/x/proj')}.db",
         )

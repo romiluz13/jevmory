@@ -2,11 +2,11 @@
 
 Scope: commits `44ed1fc` (ingestion v2 deltas), `4e187bc` (M2 judgment),
 `4e8eaee` (M3 memory), `34848b7` (M4 audit), `0447cdf` (M5 dream engine).
-All code under `dream_md/` + `tests/` + `scripts/`. Reviewed against PLAN
+All code under `jev_md/` + `tests/` + `scripts/`. Reviewed against PLAN
 **v2**, DOMAIN invariants, `docs/reference/typesafe-api.md`, my M0/M1 findings
 (`findings-m0m1.md`), and the DDD note's M2–M5 progress claims. Working tree
-at review time: two **untracked** WIP files (`dream_md/hook.py`,
-`dream_md/ingestion/scan.py`) — M6 territory, reviewed only as observations
+at review time: two **untracked** WIP files (`jev_md/hook.py`,
+`jev_md/ingestion/scan.py`) — M6 territory, reviewed only as observations
 (S8); the five commits under review are exactly the committed code.
 
 ## Checks I ran (independent verification, not the DDD note's word)
@@ -73,7 +73,7 @@ surviving verdicts), so it is invisible to `runs.stats` too.
 
 **Why this is major, not edge:** the pinned smoke shows **357 candidates /
 147 statements ≈ 2.4 chunks per statement** on the real corpus. The first
-real `dream-md dream` would silently lose on the order of half the claims
+real `jev-md dream` would silently lose on the order of half the claims
 contained in long statements — precisely the dense, decision-heavy user
 messages that matter most — while paying Jev to grade them and writing
 receipts for verdicts never acted on.
@@ -165,9 +165,9 @@ contradicts links of the ask, not the oldest.
 
 ### [OBSERVATION] S8 — Untracked M6 WIP files import a module that does not exist
 
-`dream_md/hook.py:32` (`from .ingestion.parsers import …`) and
-`dream_md/ingestion/scan.py:23` (`from .parsers import …`) both reference
-`dream_md.ingestion.parsers`; the parser modules are `claude.py` /
+`jev_md/hook.py:32` (`from .ingestion.parsers import …`) and
+`jev_md/ingestion/scan.py:23` (`from .parsers import …`) both reference
+`jev_md.ingestion.parsers`; the parser modules are `claude.py` /
 `codex.py` exporting `parse_claude_transcript` / `parse_codex_transcript`.
 **Both files fail at import time today** (verified). Untracked, so nothing
 committed is broken and the suite is green — but M6 is being built on a

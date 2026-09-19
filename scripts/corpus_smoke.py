@@ -21,11 +21,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from dream_md.ingestion.claude import parse_claude_transcript
-from dream_md.ingestion.codex import parse_codex_transcript
-from dream_md.ingestion.extract import extract_candidates
-from dream_md.ingestion.redact import redactions_in
-from dream_md.thresholds import CHUNK_MAX_CHARS, CONTEXT_MAX_CHARS, MIN_CANDIDATE_CHARS
+from jev_md.ingestion.claude import parse_claude_transcript
+from jev_md.ingestion.codex import parse_codex_transcript
+from jev_md.ingestion.extract import extract_candidates
+from jev_md.ingestion.redact import redactions_in
+from jev_md.thresholds import CHUNK_MAX_CHARS, CONTEXT_MAX_CHARS, MIN_CANDIDATE_CHARS
 
 # (path, parser) — deliberate mix: mainline Claude sessions, one Claude
 # sidechain (agent-*.jsonl carrying the PARENT session id), and Codex

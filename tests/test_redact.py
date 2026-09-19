@@ -14,7 +14,7 @@ from __future__ import annotations
 import base64
 import unittest
 
-from dream_md.ingestion.redact import redact, redactions_in
+from jev_md.ingestion.redact import redact, redactions_in
 
 # --- runtime-assembled rule-shape samples (never real credentials) -------
 JWT = ".".join(("ey" + "Jplaceholder1", "placeholder2", "signature123"))

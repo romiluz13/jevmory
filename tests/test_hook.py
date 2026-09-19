@@ -1,13 +1,13 @@
 """Hook tests (M6): the never-die contract, end to end.
 
-`python3 -m dream_md.hook` runs after every agent session; a bug here
+`python3 -m jev_md.hook` runs after every agent session; a bug here
 must never surface to the agent. These tests pin the contract from
 every angle: happy-path ingest (claude stdin, codex argv), tolerant
 key spellings, attribution precedence, idempotent re-ingest, and the
 failure modes that must degrade to a logged skip or logged error —
 never a nonzero exit, never an exception.
 
-All state lands under a temp ``home`` (``DREAM_MD_HOME`` territory);
+All state lands under a temp ``home`` (``JEV_MD_HOME`` territory);
 the real home is never touched.
 """
 
@@ -19,14 +19,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from dream_md.hook import (
+from jev_md.hook import (
     extract_payload,
     global_log_path,
     log_path,
     run_hook,
 )
-from dream_md.ingestion.eventlog import project_slug, store_path
-from dream_md.memory.schema import connect
+from jev_md.ingestion.eventlog import project_slug, store_path
+from jev_md.memory.schema import connect
 
 CLAUDE_SID = "00000000-0000-4000-8000-0000000000c1"
 CODEX_SID = "11111111-0000-4000-8000-0000000000d1"
@@ -155,7 +155,7 @@ class HookTest(unittest.TestCase):
         # Contract floor: even a crash INSIDE the hook body is logged to
         # the global log and swallowed — the agent never sees it.
         with mock.patch(
-            "dream_md.hook.extract_payload", side_effect=RuntimeError("boom")
+            "jev_md.hook.extract_payload", side_effect=RuntimeError("boom")
         ):
             rc = run_hook([], "{}", home=self.home)
         self.assertEqual(rc, 0)
@@ -390,27 +390,27 @@ class LogPathTest(unittest.TestCase):
             path = log_path("/x/proj", home=home)
             self.assertEqual(
                 path,
-                home / ".dream-md" / "hooks" / f"{project_slug('/x/proj')}.jsonl",
+                home / ".jev-md" / "hooks" / f"{project_slug('/x/proj')}.jsonl",
             )
 
     def test_global_log_is_fixed_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(
                 global_log_path(Path(tmp)),
-                Path(tmp) / ".dream-md" / "hooks" / "global.jsonl",
+                Path(tmp) / ".jev-md" / "hooks" / "global.jsonl",
             )
 
     def test_append_log_survives_unwritable_home(self):
         # best effort, never raises: a home path blocked by a regular
         # file must not kill the hook (the write fails, is swallowed)
-        from dream_md.hook import append_log
+        from jev_md.hook import append_log
 
         with tempfile.TemporaryDirectory() as tmp:
             blocker = Path(tmp) / "blocker"
             blocker.write_text("i am a file", encoding="utf-8")
             append_log(None, {"event": "x"}, home=blocker)  # must not raise
             self.assertFalse(
-                (blocker / ".dream-md").exists()
+                (blocker / ".jev-md").exists()
             )  # nothing was written
 
 
