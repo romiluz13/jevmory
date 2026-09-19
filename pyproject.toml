@@ -37,7 +37,9 @@ classifiers = [
 # setuptools above is build-time only, used for the console entry point.
 
 [project.urls]
-Homepage = "https://github.com/you/jev-md"
+Homepage = "https://github.com/romiluz13/jev-md"
+Bugs = "https://github.com/romiluz13/jev-md/issues"
+Changelog = "https://github.com/romiluz13/jev-md/blob/main/CHANGELOG.md"
 
 [project.scripts]
 jev-md = "jev_md.cli:main"

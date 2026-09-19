@@ -43,7 +43,7 @@ Facts are quotes, not summaries — the memory can't hallucinate.
 Requires Python ≥3.10 and nothing else — stdlib only, no pip deps.
 
 ```sh
-git clone https://github.com/you/jev-md && cd jev-md
+git clone https://github.com/romiluz13/jev-md && cd jev-md
 
 # in your project:
 jev-md init                     # setup; the store appears on first ingest
