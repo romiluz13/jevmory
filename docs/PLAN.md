@@ -1,7 +1,7 @@
-# jev.md — implementation plan (v2, post-review)
+# jevmory.md — implementation plan (v2, post-review)
 
 Status: v2 — incorporates Kimi's plan attack (`.team/kimi/findings-plan.md`); all
-blockers/majors accepted, adjudication logged in `.ddd/notes/jev-md.md`.
+blockers/majors accepted, adjudication logged in `.ddd/notes/jevmory.md`.
 Owner: GLM (code), Kimi (review), lead (decisions). Method: DDD.
 
 v2 changes from v1 (what GLM must re-read):
@@ -25,10 +25,10 @@ v2 changes from v1 (what GLM must re-read):
 
 ## Pitch (one line)
 
-**jev.md — your coding agent's memory, with receipts.** Local, zero-dependency
-Python CLI. Turns session transcripts into a `jev.md` memory file where every
+**jevmory.md — your coding agent's memory, with receipts.** Local, zero-dependency
+Python CLI. Turns session transcripts into a `jevmory.md` memory file where every
 fact is a verbatim quote graded by TypeSafe Jev's calibrated confidence, with
-redaction at rest. The viral one-liner: `jev-md audit MEMORY.md` — "your agent's
+redaction at rest. The viral one-liner: `jevmory audit MEMORY.md` — "your agent's
 memory has 3 stale lines and 1 wrong one; here are the receipts."
 
 ## Non-negotiable design decisions
@@ -36,12 +36,12 @@ memory has 3 stale lines and 1 wrong one; here are the receipts."
 1. **Python 3, stdlib only.** No pip deps. Runs anywhere python3 runs.
 2. **Zero LLM generation.** Facts are verbatim quotes (with verbatim context).
    Jev judges; code selects and composes.
-3. **Per-project SQLite store** at `~/.jev-md/projects/<slug>.db`; `jev.md`
+3. **Per-project SQLite store** at `~/.jevmory/projects/<slug>.db`; `jevmory.md`
    written at project root, sentinel-guarded (refuse overwrite without sentinel
    unless `--force`).
 4. **Privacy by architecture:** hooks only ever ingest locally. Grading (anything
    that calls the Jev API) requires a per-project opt-in marker
-   `~/.jev-md/projects/<slug>.optin`, created by `jev-md init --enable-grading`.
+   `~/.jevmory/projects/<slug>.optin`, created by `jevmory init --enable-grading`.
    No marker → candidates queue; `status` says so. README documents exactly what
    leaves (redacted candidate quotes ≤600 chars, never whole transcripts).
 5. **Redaction at rest:** deterministic scrub pass at ingest, BEFORE storage —
@@ -71,7 +71,7 @@ transcripts (jsonl) ── hooks (claude SessionEnd / codex notify) ── or --
         │
    [dream]      verdicts: keep / supersede / retire / ask(→ resolve or expire)
         │
-   jev.md  (sentinel-guarded artifact agents read)
+   jevmory.md  (sentinel-guarded artifact agents read)
 ```
 
 ## Ingestion details
@@ -135,7 +135,7 @@ statements, redacted). Per line `i`:
 fact.confidence = clamp01(2 * |durable_noul − 0.5|)      # certainty of durability
 ```
 Raw Jev answers are stored verbatim in the `judgments` table — every number in
-jev.md is reproducible from stored receipts. Choice/Score confidences are used
+jevmory.md is reproducible from stored receipts. Choice/Score confidences are used
 in their own decision rules, never blended into `fact.confidence`.
 Documented in `thresholds.py` as named constants + this formula.
 
@@ -154,7 +154,7 @@ Documented in `thresholds.py` as named constants + this formula.
   purely visual staleness badge at >30 days. Only contradiction evidence changes
   status. (Rationale: absence of mention is not evidence of staleness.)
 - **Ask lifecycle:** asks expire after 3 consecutive unresolved dreams (counted in
-  stats); `jev-md resolve <fact_id> --keep-new|--keep-old` writes a resolution
+  stats); `jevmory resolve <fact_id> --keep-new|--keep-old` writes a resolution
   row (judgment_kind='human') and applies it.
 - Thresholds are priors, hand-tuned on the fixture corpus before the demo; tuning
   recorded in the DDD note.
@@ -206,35 +206,35 @@ CREATE VIRTUAL TABLE facts_fts USING fts5(claim, content='facts', content_rowid=
 -- active-status facts only ever participate in similarity search.
 ```
 
-## jev.md output format
+## jevmory.md output format
 
 ```markdown
-<!-- jev-md v0.1.0 sentinel — generated file, do not edit; regenerate with `jev-md dream` -->
-# jev.md
+<!-- jevmory v0.1.0 sentinel — generated file, do not edit; regenerate with `jevmory dream` -->
+# jevmory.md
 
 ## Tooling
 - **"always use `uv run` in this repo, plain python breaks the lockfile"**
   `pitfall · important` — confidence **0.91** (2·|0.955−0.5|) · seen in 3 sessions · last seen Sep 18
 
 ## Questions for you
-- "we migrated to Bun" (confidence 0.55) vs "npm is the runtime here" — which is current? `jev-md resolve <id> --keep-new|--keep-old`
+- "we migrated to Bun" (confidence 0.55) vs "npm is the runtime here" — which is current? `jevmory resolve <id> --keep-new|--keep-old`
 ```
 
 ## CLI surface (v2)
 
 ```
-jev-md init [--enable-grading] [--project DIR]   # per-project setup; opt-in marker
-jev-md ingest --transcript PATH | --scan [--project DIR] [--test]  # local-only; --test verifies hook payload
-jev-md dream   [--project DIR] [--offline]       # grading + consolidation; writes jev.md
-jev-md audit   [MEMORY.md] [--project DIR] [--json|--md]  # demo lead; screenshot-shaped report
-jev-md resolve <fact_id> --keep-new|--keep-old   # human closes an ask
-jev-md status  [--project DIR]                   # store stats, pending, near-misses, last ingest/error, paths
-jev-md install --agent claude|codex [--project DIR]  # PRINTS hook config; never patches without --yes
+jevmory init [--enable-grading] [--project DIR]   # per-project setup; opt-in marker
+jevmory ingest --transcript PATH | --scan [--project DIR] [--test]  # local-only; --test verifies hook payload
+jevmory dream   [--project DIR] [--offline]       # grading + consolidation; writes jevmory.md
+jevmory audit   [MEMORY.md] [--project DIR] [--json|--md]  # demo lead; screenshot-shaped report
+jevmory resolve <fact_id> --keep-new|--keep-old   # human closes an ask
+jevmory status  [--project DIR]                   # store stats, pending, near-misses, last ingest/error, paths
+jevmory install --agent claude|codex [--project DIR]  # PRINTS hook config; never patches without --yes
 ```
 
 ## Milestones (v2 order — audit is the demo lead)
 
-- **M0** repo skeleton: package layout, pyproject (name jev-md, entry point),
+- **M0** repo skeleton: package layout, pyproject (name jevmory, entry point),
   stdlib-only, unittest harness, initial commit.
 - **M1** ingestion: parsers verified against REAL local transcripts (schemas
   recorded in DDD note), redaction pass + corpus tests, sentence-boundary
@@ -249,11 +249,11 @@ jev-md install --agent claude|codex [--project DIR]  # PRINTS hook config; never
 - **M4** audit (MOVED UP): memory-file line parser, Phase C, screenshot-shaped
   terminal report (aligned columns, verdict keywords, receipts), `--json`/`--md`.
 - **M5** dream engine: phases A/B composed, verdict rules, ask expiry + resolve,
-  jev.md writer with sentinel guard.
+  jevmory.md writer with sentinel guard.
 - **M6** integration: CLI wiring, `init --enable-grading`, `install` (claude hook
   JSON + codex notify snippet, print-only), `--scan` discovery, `--test` payload
   verifier, ingest never-exit-nonzero wrapper.
-- **M7** packaging: README (pitch, quickstart incl. .gitignore hint for jev.md,
+- **M7** packaging: README (pitch, quickstart incl. .gitignore hint for jevmory.md,
   privacy section: what leaves/when/how to stay local), **planted-error demo
   fixture repo** (stale line + contradiction guaranteed present), real recorded
   GIF, MIT LICENSE, stats in `status`.

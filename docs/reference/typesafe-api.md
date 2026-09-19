@@ -103,7 +103,7 @@ never crash a session).
 ## Critical design constraints (from the official docs)
 
 1. **System One does not generate text.** It never writes prose/code. It only
-   returns typed judgments. Consequence: jev.md cannot ask Jev to "summarize a
+   returns typed judgments. Consequence: jevmory.md cannot ask Jev to "summarize a
    session". Facts must be **verbatim quotes** from transcripts, selected and
    graded by judgments. Provenance is exact by construction.
 2. Ask **narrow, atomic questions** — one judgment each. Composite judgments are
