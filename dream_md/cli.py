@@ -684,19 +684,27 @@ def _patch_codex_config() -> int:
             if target.exists()
             else []
         )
-        # notify: replace an existing assignment, else insert before the
-        # first section header (TOML top-level keys must precede [sections]).
+        # notify: TOML top-level keys must precede [sections] — both the
+        # search for an existing assignment AND the insertion point stay
+        # above the first section header. A `notify =` inside a [section]
+        # is somebody else's setting: never rewritten, never hijacked
+        # (T5); instead a fresh top-level notify is inserted.
+        first_section = next(
+            (i for i, l in enumerate(lines) if re.match(r"\s*\[", l)), None
+        )
+        top_level = first_section if first_section is not None else len(lines)
         notify_at = next(
-            (i for i, l in enumerate(lines) if re.match(r"\s*notify\s*=", l)), None
+            (
+                i
+                for i in range(top_level)
+                if re.match(r"\s*notify\s*=", lines[i])
+            ),
+            None,
         )
         if notify_at is not None:
             lines[notify_at] = notify
         else:
-            first_section = next(
-                (i for i, l in enumerate(lines) if re.match(r"\s*\[", l)), None
-            )
-            at = first_section if first_section is not None else len(lines)
-            lines[at:at] = [notify, ""]
+            lines[top_level:top_level] = [notify, ""]
 
         # [features] hooks = true
         features_at = next(
@@ -740,9 +748,16 @@ def _patch_codex_config() -> int:
 # --- hook passthrough ----------------------------------------------------------
 
 def _cmd_hook(args, stdin_text: str | None) -> int:
-    """CLI alias for the module entry: same never-exit-nonzero contract."""
+    """CLI alias for the module entry: same never-exit-nonzero contract.
 
-    return run_hook(getattr(args, "hook_args", None) or [], stdin_text)
+    When main() is called without captured stdin text, read the real
+    stdin here — a piped payload must reach the hook exactly as it does
+    through ``python3 -m dream_md.hook`` (T3: the alias used to pass
+    None through and silently skip).
+    """
+
+    text = stdin_text if stdin_text is not None else _read_stdin()
+    return run_hook(getattr(args, "hook_args", None) or [], text)
 
 
 # --- parser --------------------------------------------------------------------
@@ -799,8 +814,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("audit", help="grade a memory file against the store")
     p.add_argument("memory_file", nargs="?", default="MEMORY.md")
     p.add_argument("--project", metavar="DIR")
-    p.add_argument("--json", action="store_true")
-    p.add_argument("--md", action="store_true")
+    fmt = p.add_mutually_exclusive_group()
+    fmt.add_argument("--json", action="store_true", help="machine-readable report")
+    fmt.add_argument("--md", action="store_true", help="full markdown table report")
     p.add_argument(
         "--offline",
         action="store_true",

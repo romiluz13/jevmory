@@ -445,6 +445,18 @@ class CliTest(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(self.events_count(), 0)
 
+    def test_hook_verb_reads_real_stdin_when_not_captured(self):
+        # T3: the alias must keep the module entry's contract — a payload
+        # piped to real stdin is ingested even when main() gets no
+        # captured stdin_text (it used to pass None through and skip).
+        payload = json.dumps(
+            {"transcript_path": str(self.transcript), "cwd": str(self.project)}
+        )
+        with mock.patch("sys.stdin", io.StringIO(payload)):
+            rc, out, err = self.run_cli(["hook"])  # stdin_text=None
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.events_count(), 1)
+
     # --- audit -----------------------------------------------------------------
 
     def _memory_file(self) -> Path:
@@ -457,6 +469,14 @@ class CliTest(unittest.TestCase):
             encoding="utf-8",
         )
         return memory
+
+    def test_audit_json_and_md_are_mutually_exclusive(self):
+        # T7: both flags used to be accepted, --json silently winning;
+        # argparse now rejects the combination (exit 2) before any run
+        memory = self._memory_file()
+        with self.assertRaises(SystemExit) as caught:
+            self.run_cli(["audit", str(memory), "--json", "--md"])
+        self.assertEqual(caught.exception.code, 2)
 
     def test_audit_offline_prints_the_terminal_report(self):
         self._ingested()
@@ -641,6 +661,30 @@ class InstallPatchTest(unittest.TestCase):
         text = target.read_text(encoding="utf-8")
         self.assertIn("dream_md.hook", text)
         self.assertNotIn("something", text)
+
+    def test_patch_codex_never_rewrites_a_section_scoped_notify(self):
+        # T5: a `notify =` inside a [section] is somebody else's setting —
+        # the patch must not hijack it. A fresh top-level notify is
+        # inserted instead (valid TOML); the section setting is untouched.
+        target = self.base / "config.toml"
+        target.write_text(
+            'model = "gpt-5"\n\n[notifications]\nnotify = ["slack", "hook"]\n',
+            encoding="utf-8",
+        )
+        with self.patched("_codex_config_path", target):
+            rc = _patch_codex_config()
+        self.assertEqual(rc, 0)
+        lines = target.read_text(encoding="utf-8").splitlines()
+        ours = next(
+            i for i, l in enumerate(lines) if l.startswith('notify = ["python3"')
+        )
+        theirs = next(i for i, l in enumerate(lines) if "slack" in l)
+        section = next(
+            i for i, l in enumerate(lines) if l.startswith("[notifications]")
+        )
+        self.assertLess(ours, section)  # ours is top-level: before any section
+        self.assertGreater(theirs, section)  # theirs stays inside its section
+        self.assertIn('notify = ["slack", "hook"]', lines)
 
 
 if __name__ == "__main__":

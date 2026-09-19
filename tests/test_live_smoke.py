@@ -229,6 +229,27 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("--cap", err.getvalue())
 
+    def test_dream_stage_exposes_the_force_flag(self):
+        # T7: --force used to be unreachable from the CLI; it now parses
+        # and plumbs into run_dream_smoke (here: clean marker refusal —
+        # no request, no store; the gate fires first as always)
+        with TemporaryDirectory() as tmp:
+            old_home = os.environ.get("DREAM_MD_HOME")
+            os.environ["DREAM_MD_HOME"] = tmp
+            os.environ["TYPESAFE_API_KEY"] = "test-key"
+            err, out = io.StringIO(), io.StringIO()
+            try:
+                with redirect_stderr(err), redirect_stdout(out):
+                    code = live_smoke.main(["--dream", "--force"])
+            finally:
+                os.environ.pop("TYPESAFE_API_KEY", None)
+                if old_home is None:
+                    os.environ.pop("DREAM_MD_HOME", None)
+                else:
+                    os.environ["DREAM_MD_HOME"] = old_home
+        self.assertEqual(code, 1)
+        self.assertIn("grading is not enabled", err.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

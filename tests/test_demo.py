@@ -152,6 +152,9 @@ class DemoCommandTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("1 stale line, 1 wrong line", result.stdout)
+        # T7: the printed "live equivalent" must be the complete 3-step
+        # sequence — copy-paste hits the opt-in gate without init
+        self.assertIn("dream-md init --enable-grading", result.stdout)
         self.assertIn("receipts: run ", result.stdout)
 
 

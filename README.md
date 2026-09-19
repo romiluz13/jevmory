@@ -46,9 +46,9 @@ Requires Python ≥3.10 and nothing else — stdlib only, no pip deps.
 git clone https://github.com/you/dream-md && cd dream-md
 
 # in your project:
-dream-md init                     # creates the ~/.dream-md/projects/<slug>.db store
-dream-md install claude           # prints the Claude Code SessionEnd hook JSON
-dream-md install codex            # prints the Codex notify snippet (--yes patches config)
+dream-md init                     # setup; the store appears on first ingest
+dream-md install --agent claude   # prints the Claude Code SessionEnd hook JSON
+dream-md install --agent codex    # prints the Codex notify snippet (--yes patches config)
 
 # stay fully local (nothing ever leaves):
 dream-md ingest --scan            # finds this project's transcripts and ingests
@@ -99,10 +99,16 @@ judgments behind the numbers.
   context (≤800 chars) + minimal project context — only during
   `dream`/`audit` with `$TYPESAFE_API_KEY`
   set **and** the project opted in (`dream-md init --enable-grading`).
-- **Never:** whole transcripts, file paths beyond the project name,
-  secrets (redacted at rest, before any storage — `sk-*`, AWS keys, GitHub
-  tokens, JWTs, PEM blocks, `password=`/`token=`/`api_key=` assignments,
-  high-entropy hex/base64, bearer tokens → `[redacted:<kind>]`).
+- **Never:** whole transcripts, transcript metadata (the project context
+  is just the project name — no file paths), or secrets (redacted at
+  rest, before any storage — `sk-*`, AWS keys, GitHub tokens, JWTs, PEM
+  blocks, `password=`/`token=`/`api_key=` assignments, high-entropy
+  hex/base64, bearer tokens → `[redacted:<kind>]`).
+- **Honest caveat:** quotes are verbatim conversation text. Anything
+  non-secret you typed in chat — a file path like
+  `/Users/you/proj/main.py`, an internal hostname, a person's name —
+  stays inside the quote that leaves. The redactor scrubs secrets, not
+  paths; if that matters for your project, stay in local mode.
 - **Fully local mode:** `--offline` / no key / no opt-in — events queue,
   nothing leaves. No marker → candidates queue; `dream-md status` says so.
 
@@ -131,14 +137,19 @@ TYPESAFE_API_KEY=… python3 scripts/live_smoke.py --probe   # 3 synthetic candi
 TYPESAFE_API_KEY=… python3 scripts/live_smoke.py --dream   # 1 real dream run, capped
 ```
 
-Hard cap on requests (`--cap`, default 50); `BudgetExhausted` is a
-`JevError`, so the run row closes and events stay queued — the smoke
-cannot overspend.
+Hard cap on requests (`--cap`, default 40, PLAN's smoke ceiling);
+`BudgetExhausted` is a `JevError`, so the run row closes and events stay
+queued — the smoke cannot overspend. Live-verified against the real API:
+probe (auth, envelope, strict parse, usage accounting), a capped dream
+over real transcripts, and a live audit that caught a planted wrong line
+with receipts in the store's `runs`/`judgments` tables.
 
 ## Status
 
-504 offline tests (`python3 -m unittest discover`) — no network, no API
-key, FakeJev including adversarial mode. Modules M0–M7 complete.
+508 offline tests (`python3 -m unittest discover`) — no network, no API
+key, FakeJev including adversarial mode. Modules M0–M7 complete;
+pipeline live-verified against the real Jev API (probe, capped dream,
+audit).
 
 ## License
 

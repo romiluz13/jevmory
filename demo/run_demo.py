@@ -184,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     print("           the errors are guaranteed present. Live equivalent,")
     print("           same report shape:")
     print()
+    print("  dream-md init --enable-grading")
     print("  dream-md ingest --transcript demo/transcript.jsonl --project demo")
     print("  dream-md audit demo/MEMORY.md --project demo")
     print()

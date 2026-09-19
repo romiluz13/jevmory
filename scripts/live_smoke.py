@@ -302,6 +302,12 @@ def main(argv: list[str] | None = None) -> int:
         default=3,
         help="probe size, 1-3 (default 3)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="dream stage: overwrite a foreign dream.md "
+        "(same rule as `dream-md dream --force`)",
+    )
     args = parser.parse_args(argv)
 
     key = os.environ.get("TYPESAFE_API_KEY")
@@ -320,7 +326,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.dream:
             project = os.path.realpath(os.path.expanduser(args.project))
             print(f"live smoke — dream on {project} (cap {args.cap} requests)")
-            result = run_dream_smoke(project, key, cap=args.cap)
+            result = run_dream_smoke(
+                project, key, cap=args.cap, force=args.force
+            )
             _print_dream(result)
             print("dream smoke: OK")
             return 0
