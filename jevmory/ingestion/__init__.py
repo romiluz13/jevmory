@@ -1,9 +1,9 @@
 """Ingestion sub-domain (docs/DOMAIN.md): session transcript parsing
-(Claude Code, Codex), the immutable Event log, and deterministic
+(Claude Code, Codex, Droid), the immutable Event log, and deterministic
 Statement/Candidate extraction.
 
 Parsers are built from real transcripts observed on this machine
-(2026-09-19); observed schemas are recorded in ``.ddd/notes/jevmory.md``.
+(2026-09-19/20); observed schemas are recorded in ``.ddd/notes/jev-md.md``.
 Statements are raw/verbatim from parsers; redaction happens at the
 storage boundary (``EventLog.append``, DOMAIN #6). DDL lives in
 ``jevmory.memory.schema`` (review R7), never here.
@@ -11,6 +11,7 @@ storage boundary (``EventLog.append``, DOMAIN #6). DDL lives in
 
 from jevmory.ingestion.claude import parse_claude_transcript
 from jevmory.ingestion.codex import parse_codex_transcript
+from jevmory.ingestion.droid import parse_droid_transcript
 from jevmory.ingestion.eventlog import (
     AppendResult,
     EventLog,
@@ -36,6 +37,7 @@ from jevmory.ingestion.models import (
     ROLE_USER,
     SOURCE_CLAUDE,
     SOURCE_CODEX,
+    SOURCE_DROID,
     SOURCE_MANUAL,
 )
 from jevmory.ingestion.redact import (
@@ -61,6 +63,7 @@ __all__ = [
     "ROLE_USER",
     "SOURCE_CLAUDE",
     "SOURCE_CODEX",
+    "SOURCE_DROID",
     "SOURCE_MANUAL",
     "candidates_from_statements",
     "chunk_text",
@@ -69,6 +72,7 @@ __all__ = [
     "normalize_content",
     "parse_claude_transcript",
     "parse_codex_transcript",
+    "parse_droid_transcript",
     "project_slug",
     "redact",
     "redactions_in",

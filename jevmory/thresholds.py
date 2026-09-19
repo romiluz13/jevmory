@@ -3,7 +3,7 @@
 One module, named constants: the gates, budgets, and bounds that code
 applies but never invents inline. Priors, hand-tuned on the fixture
 corpus before the demo; every tuning change is recorded in the DDD note
-(``.ddd/notes/jevmory.md``) per the threshold policy.
+(``.ddd/notes/jev-md.md``) per the threshold policy.
 
 Confidence — one formula (DOMAIN "Confidence", PLAN "Confidence")::
 

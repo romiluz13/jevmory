@@ -53,6 +53,7 @@ from jevmory.hook import (
 )
 from jevmory.ingestion.claude import parse_claude_transcript
 from jevmory.ingestion.codex import parse_codex_transcript
+from jevmory.ingestion.droid import parse_droid_transcript
 from jevmory.ingestion.eventlog import (
     EventLog,
     default_home,
@@ -128,7 +129,9 @@ def _parse_transcript(path: str, agent: str | None):
         return parse_claude_transcript(path), "claude"
     if source == "codex":
         return parse_codex_transcript(path), "codex"
-    raise ValueError(f"unknown agent {source!r} (use claude or codex)")
+    if source == "droid":
+        return parse_droid_transcript(path), "droid"
+    raise ValueError(f"unknown agent {source!r} (use claude, codex or droid)")
 
 
 # --- init ----------------------------------------------------------------------
@@ -160,7 +163,8 @@ def _cmd_init(args, stdin_text: str | None) -> int:
 
     print(
         "ingest:   jevmory ingest --scan   (finds this project's transcripts\n"
-        "          under ~/.claude/projects and ~/.codex/sessions — local only)\n"
+        "          under ~/.claude/projects, ~/.codex/sessions and\n"
+        "          ~/.factory/sessions — local only)\n"
         "hooks:    jevmory install --agent claude|codex   (prints config)"
     )
     return 0
@@ -216,17 +220,20 @@ def _ingest_scan(args) -> int:
             f"no transcripts found for {project}\n"
             "looked in (first 64KB of each *.jsonl, matching the project path):\n"
             f"  {default_home() / '.claude' / 'projects'}\n"
-            f"  {default_home() / '.codex' / 'sessions'}"
+            f"  {default_home() / '.codex' / 'sessions'}\n"
+            f"  {default_home() / '.factory' / 'sessions'}"
         )
         return 0
     total_inserted = 0
     total_ignored = 0
     for item in found:
         try:
-            if item.source == "claude":
-                parsed = parse_claude_transcript(item.path)
-            else:
-                parsed = parse_codex_transcript(item.path)
+            parser = {
+                "claude": parse_claude_transcript,
+                "codex": parse_codex_transcript,
+                "droid": parse_droid_transcript,
+            }[item.source]
+            parsed = parser(item.path)
             result = EventLog.for_project(project).append(parsed)
         except (OSError, ValueError) as exc:
             print(f"  skip {item.path}: {exc}")
@@ -795,7 +802,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="verify a hook payload (stdin) or transcript; write nothing",
     )
-    p.add_argument("--agent", choices=("claude", "codex"))
+    p.add_argument("--agent", choices=("claude", "codex", "droid"))
     p.add_argument("--project", metavar="DIR")
     p.set_defaults(func=_cmd_ingest)
 

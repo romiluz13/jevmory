@@ -1,11 +1,11 @@
 """Neutral data structures for the ingestion sub-domain.
 
-The parsers (``claude.py``, ``codex.py``) own every format-specific
-decision; this module only defines the format-independent records they
-both produce, plus the role/source vocabularies of the events table
-(docs/PLAN.md, schema v2). Statements are RAW here (verbatim, unredacted
-by design — parsers never rewrite); redaction happens at the storage
-boundary in ``eventlog.EventLog.append`` (DOMAIN #6).
+The parsers (``claude.py``, ``codex.py``, ``droid.py``) own every
+format-specific decision; this module only defines the format-independent
+records they all produce, plus the role/source vocabularies of the events
+table (docs/PLAN.md, schema v2). Statements are RAW here (verbatim,
+unredacted by design — parsers never rewrite); redaction happens at the
+storage boundary in ``eventlog.EventLog.append`` (DOMAIN #6).
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ ROLE_TOOL = "tool"
 
 SOURCE_CLAUDE = "claude"
 SOURCE_CODEX = "codex"
+SOURCE_DROID = "droid"
 SOURCE_MANUAL = "manual"
 
 
@@ -49,7 +50,7 @@ class ParsedTranscript:
     """Result of parsing one transcript file."""
 
     path: str
-    source: str  # 'claude' | 'codex'
+    source: str  # 'claude' | 'codex' | 'droid'
     session_id: str | None
     cwd: str | None
     statements: tuple[Statement, ...]

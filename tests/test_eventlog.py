@@ -11,6 +11,7 @@ from pathlib import Path
 
 from jevmory.ingestion.claude import parse_claude_transcript
 from jevmory.ingestion.codex import parse_codex_transcript
+from jevmory.ingestion.droid import parse_droid_transcript
 from jevmory.ingestion.eventlog import (
     EventLog,
     event_id,
@@ -86,6 +87,7 @@ class EventLogTest(unittest.TestCase):
         self.addCleanup(self.log.close)
         self.claude = parse_claude_transcript(FIXTURES / "claude_session.jsonl")
         self.codex = parse_codex_transcript(FIXTURES / "codex_session.jsonl")
+        self.droid = parse_droid_transcript(FIXTURES / "droid_session.jsonl")
 
     def _rows(self) -> dict:
         return {
@@ -184,14 +186,16 @@ class EventLogTest(unittest.TestCase):
     def test_mixed_sources_coexist(self):
         self.log.append(self.claude)
         self.log.append(self.codex)
+        self.log.append(self.droid)
         # claude fixture: 5 statements; codex fixture: 6 (dogfood round 1
-        # added machine-injected lines — excluded — and human survivors)
-        self.assertEqual(self.log.count_all(), 5 + 6)
+        # added machine-injected lines — excluded — and human survivors);
+        # droid fixture: 7 (dogfood round 1, commit 2)
+        self.assertEqual(self.log.count_all(), 5 + 6 + 7)
         sources = {
             row[0]
             for row in self.log._conn.execute("SELECT source FROM events")
         }
-        self.assertEqual(sources, {"claude", "codex"})
+        self.assertEqual(sources, {"claude", "codex", "droid"})
 
     def test_two_threads_ingest_concurrently(self):
         # WAL + busy_timeout=5000 must make concurrent appends just work

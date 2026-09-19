@@ -21,6 +21,7 @@ from jevmory.ingestion.scan import detect_source, discover_transcripts
 
 CLAUDE_SID = "00000000-0000-4000-8000-0000000000c1"
 CODEX_SID = "11111111-0000-4000-8000-0000000000d1"
+DROID_SID = "22222222-0000-4000-8000-0000000000e1"
 
 
 def claude_line(cwd: str | None, sid: str = CLAUDE_SID) -> str:
@@ -65,6 +66,26 @@ def write_codex_transcript(path: Path, cwd: str | None, sid: str = CODEX_SID) ->
     return path
 
 
+def write_droid_transcript(path: Path, cwd: str | None, sid: str = DROID_SID) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "type": "session_start",
+                "id": sid,
+                "title": "session",
+                "owner": "dev",
+                "version": 2,
+                "cwd": cwd,
+                "hostId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 class DiscoverTranscriptsTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -99,6 +120,17 @@ class DiscoverTranscriptsTest(unittest.TestCase):
         self.assertEqual(found[0].path, str(transcript))
         self.assertEqual(found[0].source, "codex")
 
+    def test_finds_droid_transcript_for_the_project(self):
+        # Droid sessions live under ~/.factory/sessions/<dir-slug>/.
+        transcript = write_droid_transcript(
+            self.home / ".factory" / "sessions" / "-home-dev-proj" / f"{DROID_SID}.jsonl",
+            self.cwd,
+        )
+        found = discover_transcripts(str(self.project), home=self.home)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].path, str(transcript))
+        self.assertEqual(found[0].source, "droid")
+
     def test_newest_first(self):
         older = write_claude_transcript(
             self.home / ".claude" / "projects" / "p" / "older.jsonl",
@@ -122,6 +154,10 @@ class DiscoverTranscriptsTest(unittest.TestCase):
         )
         write_codex_transcript(
             self.home / ".codex" / "sessions" / "2026" / "05" / "18" / "r.jsonl",
+            str(self.home / "unrelated"),
+        )
+        write_droid_transcript(
+            self.home / ".factory" / "sessions" / "-home-unrelated" / "d.jsonl",
             str(self.home / "unrelated"),
         )
         self.assertEqual(discover_transcripts(str(self.project), home=self.home), [])
@@ -185,12 +221,13 @@ class DetectSourceTest(unittest.TestCase):
         return path
 
     def test_location_hints_win_without_opening_the_file(self):
-        # A path under .claude/ or .codex/ is decided by location alone;
-        # these files do not even exist.
+        # A path under .claude/ or .codex/ or .factory/ is decided by
+        # location alone; these files do not even exist.
         from jevmory.ingestion.scan import detect_source
 
         self.assertEqual(detect_source("/nowhere/.claude/projects/x.jsonl"), "claude")
         self.assertEqual(detect_source("/nowhere/.codex/sessions/x.jsonl"), "codex")
+        self.assertEqual(detect_source("/nowhere/.factory/sessions/x.jsonl"), "droid")
 
     def test_codex_sniffed_from_session_meta_first_line(self):
         path = self.write(
@@ -200,6 +237,13 @@ class DetectSourceTest(unittest.TestCase):
             ),
         )
         self.assertEqual(detect_source(path), "codex")
+
+    def test_droid_sniffed_from_session_start_first_line(self):
+        path = self.write(
+            "sniff-droid.jsonl",
+            json.dumps({"type": "session_start", "id": "x", "cwd": "/p"}),
+        )
+        self.assertEqual(detect_source(path), "droid")
 
     def test_claude_sniffed_from_sessionId_first_line(self):
         path = self.write(

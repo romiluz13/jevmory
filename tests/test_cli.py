@@ -34,6 +34,7 @@ from jevmory.memory.schema import connect, migrate
 
 CLAUDE_SID = "00000000-0000-4000-8000-0000000000c1"
 CODEX_SID = "11111111-0000-4000-8000-0000000000d1"
+DROID_SID = "22222222-0000-4000-8000-0000000000e1"
 
 
 def write_claude_transcript(path: Path, cwd: str | None) -> Path:
@@ -55,6 +56,45 @@ def write_claude_transcript(path: Path, cwd: str | None) -> Path:
                         "Always run the full test suite before pushing "
                         "in this repo."
                     ),
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def write_droid_transcript(path: Path, cwd: str | None) -> Path:
+    # Minimal real-shape droid session: flat session_start + one user
+    # text message (hooks/machine injections tested in the parser suite).
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "type": "session_start",
+                "id": DROID_SID,
+                "title": "session",
+                "owner": "dev",
+                "version": 2,
+                "cwd": cwd,
+                "hostId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "type": "message",
+                "id": "33333333-0000-4000-8000-000000000001",
+                "timestamp": "2026-09-20T10:00:01.000Z",
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Never push directly to main in this repo.",
+                        }
+                    ],
                 },
             }
         )
@@ -212,6 +252,36 @@ class CliTest(unittest.TestCase):
         )
         self.assertEqual(rc, 0)
         self.assertIn(str(scanned), out)
+        self.assertIn("transcripts: 1", out)
+        self.assertIn("inserted: 1", out)
+        self.assertEqual(self.events_count(), 1)
+
+    def test_ingest_droid_transcript_with_agent_flag(self):
+        # --agent droid skips source detection; the sniff (session_start
+        # first line) would also find it, but the flag is the guarantee.
+        droid = write_droid_transcript(
+            self.home / "t" / "droid-session.jsonl", str(self.project)
+        )
+        rc, out, err = self.run_cli(
+            ["ingest", "--transcript", str(droid),
+             "--agent", "droid", "--project", str(self.project)]
+        )
+        self.assertEqual(rc, 0)
+        self.assertIn("source:      droid", out)
+        self.assertIn("inserted:    1", out)
+        self.assertEqual(self.events_count(), 1)
+
+    def test_ingest_scan_discovers_droid_transcript(self):
+        # Third root: ~/.factory/sessions/<dir-slug>/<uuid>.jsonl.
+        write_droid_transcript(
+            self.home / ".factory" / "sessions" / "-home-dev-proj" / f"{DROID_SID}.jsonl",
+            str(self.project.resolve()),
+        )
+        rc, out, err = self.run_cli(
+            ["ingest", "--scan", "--project", str(self.project)]
+        )
+        self.assertEqual(rc, 0)
+        self.assertIn("droid ", out)
         self.assertIn("transcripts: 1", out)
         self.assertIn("inserted: 1", out)
         self.assertEqual(self.events_count(), 1)
