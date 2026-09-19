@@ -6,10 +6,38 @@ build-backend = "setuptools.build_meta"
 name = "dream-md"
 version = "0.1.0"
 description = "Coding-agent memory where every fact is a verbatim quote graded by calibrated confidence."
+readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
+keywords = [
+    "coding-agent",
+    "agent-memory",
+    "memory",
+    "llm",
+    "calibrated-confidence",
+    "sqlite",
+    "zero-dependency",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Utilities",
+]
 # Runtime dependencies: none, ever. Python 3 stdlib only (mission decision);
 # setuptools above is build-time only, used for the console entry point.
+
+[project.urls]
+Homepage = "https://github.com/you/dream-md"
 
 [project.scripts]
 dream-md = "dream_md.cli:main"
