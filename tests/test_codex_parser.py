@@ -33,8 +33,12 @@ class CodexParserTest(unittest.TestCase):
 
     def test_statements_come_from_message_payloads_only(self):
         # fixture lines: 4 user prompt, 7 assistant output_text,
-        # 15 user text next to an input_image. All other lines skipped.
-        self.assertEqual([s.line_no for s in self.parsed.statements], [4, 7, 15])
+        # 15 user text next to an input_image, 22-24 genuine human
+        # texts (dogfood round 1 survivors). All other lines skipped
+        # (machine-injected, non-message, or malformed).
+        self.assertEqual(
+            [s.line_no for s in self.parsed.statements], [4, 7, 15, 22, 23, 24]
+        )
 
     def test_real_user_prompt_extracted_verbatim(self):
         statement = self.parsed.statements[0]
@@ -64,6 +68,40 @@ class CodexParserTest(unittest.TestCase):
         self.assertNotIn("<environment_context>", all_text)
         self.assertNotIn("AGENTS.md", all_text)
         self.assertNotIn("<heartbeat>", all_text)
+
+    def test_herdr_dispatch_prompts_skipped(self):
+        # Dogfood round 1 (F2): herdr agent prompts land in the USER
+        # role ("You are running ...", "PLEASE IMPLEMENT THIS PLAN:")
+        # and became junk facts before this exclusion.
+        all_text = " ".join(s.text for s in self.parsed.statements)
+        self.assertNotIn("Build-Bench", all_text)
+        self.assertNotIn("You are running", all_text)
+
+    def test_codex_wrapper_injections_skipped(self):
+        # Dogfood round 1 (F2): more codex-pushed wrappers in the USER
+        # role beyond the original six.
+        all_text = " ".join(s.text for s in self.parsed.statements)
+        self.assertNotIn("recommended_plugins", all_text)
+        self.assertNotIn("Files mentioned by the user", all_text)
+
+    def test_old_format_replay_lines_skipped(self):
+        # Dogfood round 1 (F2): older rollout formats replay the prior
+        # conversation inside the USER role as numbered lines — the
+        # numeric prefix varies, so these need EXCLUDED_USER_PATTERNS.
+        all_text = " ".join(s.text for s in self.parsed.statements)
+        self.assertNotIn("[3] tool exec result", all_text)
+        self.assertNotIn("[8] tool exec call", all_text)
+
+    def test_genuine_human_texts_survive(self):
+        # Judgment rule (dogfood round 1): exclusions must never be
+        # broad enough to catch normal speech. Bare "You are " and
+        # "In /Users/..." opens are human-plausible and stay.
+        texts = {s.text for s in self.parsed.statements}
+        self.assertIn("keep going", texts)
+        self.assertIn("In /Users/dev/example, read-only triage.", texts)
+        self.assertIn(
+            "You are right, the Safari fix belongs in styles.css.", texts
+        )
 
     def test_developer_role_is_machine_text_skipped(self):
         roles = {s.role for s in self.parsed.statements}

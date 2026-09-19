@@ -95,7 +95,7 @@ class RenderDreamMdTest(unittest.TestCase):
         # then 2 at lower confidence) ahead of the 1.0 group
         self.assertEqual(order, ["claim 3", "claim 4", "claim 2", "claim 1"])
 
-    def test_receipt_line_formula_sessions_last_seen(self):
+    def test_receipt_line_confidence_sessions_last_seen(self):
         fact = make_fact(
             claim="always run tests with uv run pytest",
             category="convention",
@@ -106,7 +106,11 @@ class RenderDreamMdTest(unittest.TestCase):
         md = render_jevmory([fact], now=NOW, sessions_by_fact={fact.id: 3})
         self.assertIn('- **"always run tests with uv run pytest"**', md)
         self.assertIn("`convention · important`", md)  # 1.6 rounds to 2
-        self.assertIn("confidence **0.80** (2·|0.900−0.5|)", md)
+        self.assertIn("confidence **0.80**", md)
+        # dogfood round 1 (F4): the noul-recovery formula is gone —
+        # plain calibrated confidence, no developer math
+        self.assertNotIn("2·|", md)
+        self.assertNotIn("0.900", md)
         self.assertIn("seen in 3 sessions", md)
         self.assertIn("last seen Sep 1", md)
         self.assertNotIn("stale", md)  # 18 days: no badge

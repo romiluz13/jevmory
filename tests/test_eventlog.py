@@ -184,7 +184,9 @@ class EventLogTest(unittest.TestCase):
     def test_mixed_sources_coexist(self):
         self.log.append(self.claude)
         self.log.append(self.codex)
-        self.assertEqual(self.log.count_all(), 5 + 3)
+        # claude fixture: 5 statements; codex fixture: 6 (dogfood round 1
+        # added machine-injected lines — excluded — and human survivors)
+        self.assertEqual(self.log.count_all(), 5 + 6)
         sources = {
             row[0]
             for row in self.log._conn.execute("SELECT source FROM events")
@@ -212,7 +214,7 @@ class EventLogTest(unittest.TestCase):
         for thread in threads:
             thread.join()
         self.assertEqual(errors, [])
-        self.assertEqual(self.log.count_all(), 8)
+        self.assertEqual(self.log.count_all(), 5 + 6)  # claude + codex fixtures
 
 
 class StorePathTest(unittest.TestCase):

@@ -16,12 +16,15 @@ Composes the M1-M4 layers into a single deterministic pass:
    verdict is routed by GROUP KEY ``(normalize_claim(text), role)``,
    never by event id alone (review S1: event-id keying silently
    discarded all but the last chunk's verdict).
-3. **Cap + ordering** — events are selected user-role-first (user
-   statements are decisions), rowid order within; the cap counts
-   candidate groups (``MAX_CANDIDATES_PER_DREAM``); events past it
-   stay pending (``events_deferred``). Events whose statements yield
-   no candidates are graded too — an empty yield is deterministic and
-   must not re-queue forever.
+3. **Cap + ordering** — events are selected in plain queue order
+   (rowid — the order scan inserted them). The user-role-first
+   priority was removed in dogfood round 1 (F1): on real codex corpora
+   user lines are chitchat and commands while durable knowledge lives
+   in assistant statements, so role priority just burned budget. The
+   cap counts candidate groups (``MAX_CANDIDATES_PER_DREAM``); events
+   past it stay pending (``events_deferred``). Events whose statements
+   yield no candidates are graded too — an empty yield is deterministic
+   and must not re-queue forever.
 4. **Ask expiry** — every ask open when the dream begins is bumped;
    at ``ASK_EXPIRY_DREAMS`` it expires keep-old (``dream.resolve``).
    An ask created BY this dream is not counted for it.
@@ -81,7 +84,7 @@ from jevmory.dream.rules import (
 from jevmory.dream.writer import AskPair
 from jevmory.ingestion.eventlog import optin_path
 from jevmory.ingestion.extract import Candidate, candidates_from_statements
-from jevmory.ingestion.models import ROLE_USER, Statement
+from jevmory.ingestion.models import Statement
 from jevmory.judgment.batch import plan_phase_a
 from jevmory.judgment.errors import JevError
 from jevmory.memory.facts import (
@@ -514,16 +517,15 @@ def _group_key(candidate: Candidate) -> tuple[str, str]:
 
 
 class _PendingEvents:
-    """Pending event rows in rowid order: ids + roles for selection."""
+    """Pending event rows in rowid order: ids for selection."""
 
     def __init__(self, rows: Sequence[sqlite3.Row | tuple]) -> None:
         self.ids: list[str] = [row[0] for row in rows]
-        self.roles: list[str] = [row[3] for row in rows]
 
 
 def _pending_events(conn: sqlite3.Connection, project: str) -> _PendingEvents:
     rows = conn.execute(
-        "SELECT id, session_id, ts, role, text FROM events "
+        "SELECT id FROM events "
         "WHERE project = ? AND graded_at IS NULL ORDER BY rowid",
         (project,),
     ).fetchall()
@@ -618,26 +620,23 @@ def _select_events(
     keys: Sequence[tuple[str, str]],
     max_candidates: int | None,
 ) -> tuple[list[str], list[str]]:
-    """User-role-first event selection under the candidate-group cap.
+    """Queue-order event selection under the candidate-group cap.
 
-    Returns (selected ids, deferred ids). Selection stops at the first
-    event whose new groups would not fit; everything from there defers
-    (user decisions grade first — review R10). Events yielding no
-    candidates are always selected: an empty yield is deterministic and
-    must not re-queue forever.
+    Returns (selected ids, deferred ids). Events grade in plain queue
+    order (rowid — the order scan inserted them; dogfood round 1 F1
+    removed the user-role-first priority). Selection stops at the
+    first event whose new groups would not fit; everything from there
+    defers (review R10). Events yielding no candidates are always
+    selected: an empty yield is deterministic and must not re-queue
+    forever.
     """
     event_groups: dict[str, list[tuple[str, str]]] = {}
     for candidate, key in zip(candidates, keys):
         event_groups.setdefault(candidate.event_id, []).append(key)
 
-    order = sorted(
-        range(len(events.ids)),
-        key=lambda index: 0 if events.roles[index] == ROLE_USER else 1,
-    )  # stable: rowid order preserved within each role
     selected: list[str] = []
     covered: set[tuple[str, str]] = set()
-    for index in order:
-        event_id = events.ids[index]
+    for event_id in events.ids:
         new = [
             key
             for key in event_groups.get(event_id, ())

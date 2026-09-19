@@ -319,7 +319,9 @@ class DreamEngineTest(unittest.TestCase):
 
     # --- cap and ordering (review R10) --------------------------------------
 
-    def test_cap_is_user_first_and_progressive(self):
+    def test_cap_is_queue_order_and_progressive(self):
+        # Dogfood round 1 (F1): no role priority — events grade in
+        # plain queue order (rowid), oldest first.
         for n in range(3):
             self.add_event(
                 f"assistant narration number {n} about progress",
@@ -338,7 +340,8 @@ class DreamEngineTest(unittest.TestCase):
             "SELECT role FROM events WHERE graded_at IS NOT NULL "
             "ORDER BY rowid"
         )]
-        self.assertEqual(roles, ["user", "user"])  # decisions first
+        # queue order: the two oldest events (assistant) grade first
+        self.assertEqual(roles, ["assistant", "assistant"])
 
         second = self.dream(FakeJev(), max_candidates=2)
         self.assertEqual(second.events_graded, 2)

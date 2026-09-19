@@ -1,7 +1,7 @@
 # jevmory.md — implementation plan (v2, post-review)
 
 Status: v2 — incorporates Kimi's plan attack (`.team/kimi/findings-plan.md`); all
-blockers/majors accepted, adjudication logged in `.ddd/notes/jevmory.md`.
+blockers/majors accepted, adjudication logged in `.ddd/notes/jev-md.md`.
 Owner: GLM (code), Kimi (review), lead (decisions). Method: DDD.
 
 v2 changes from v1 (what GLM must re-read):
@@ -214,7 +214,7 @@ CREATE VIRTUAL TABLE facts_fts USING fts5(claim, content='facts', content_rowid=
 
 ## Tooling
 - **"always use `uv run` in this repo, plain python breaks the lockfile"**
-  `pitfall · important` — confidence **0.91** (2·|0.955−0.5|) · seen in 3 sessions · last seen Sep 18
+  `pitfall · important` — confidence **0.91** · seen in 3 sessions · last seen Sep 18
 
 ## Questions for you
 - "we migrated to Bun" (confidence 0.55) vs "npm is the runtime here" — which is current? `jevmory resolve <id> --keep-new|--keep-old`

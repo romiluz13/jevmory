@@ -14,8 +14,8 @@ Layout (PLAN "jevmory.md output format"):
   them is silently altered);
 - within a section: significance descending, then confidence, then id
   (stable ordering for byte-identical renders);
-- per fact a receipt line: category, significance word, confidence
-  (with the one formula spelled out from the recoverable noul), "seen
+- per fact a receipt line: category, significance word, confidence,
+  "seen
   in N sessions" (``sessions_by_fact``: distinct observing sessions —
   NOT ``support_count``, which counts events and overclaims whenever
   one session observes a claim across several turns; review S6),
@@ -150,12 +150,11 @@ def _fact_block(
 ) -> list[str]:
     """The two lines of one fact entry (plus the blank separator)."""
     word = _significance_word(fact.significance)
-    # The noul is recoverable from the stored confidence for facts:
-    # they passed a durable gate (> 0.5), so noul = 0.5 + confidence/2.
-    noul = 0.5 + fact.confidence / 2.0
+    # Dogfood round 1 (F4): plain calibrated confidence only — the
+    # noul-recovery formula was developer math in a user artifact.
     receipt = (
         f"`{fact.category} · {word}` — confidence **{fact.confidence:.2f}** "
-        f"(2·|{noul:.3f}−0.5|) · {_seen_phrase(fact, sessions)} · "
+        f"· {_seen_phrase(fact, sessions)} · "
         f"last seen {_last_seen(fact, now_dt)}"
     )
     return [f'- **"{_display(fact.claim)}"**', f"  {receipt}", ""]
