@@ -6,3 +6,6 @@ dist/
 build/
 .venv/
 jevmory.md
+
+# editable-install build cruft
+jevmory.egg-info/
