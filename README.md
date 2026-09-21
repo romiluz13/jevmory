@@ -1,50 +1,52 @@
 # jevmory — your coding agent's memory, with receipts
 
-Local, zero-dependency Python CLI. Turns session transcripts into a
-`jevmory.md` memory file where every fact is a **verbatim quote** graded by
-[TypeSafe Jev](https://typesafe.ai)'s calibrated confidence, with redaction
-at rest.
+[![CI](https://github.com/romiluz13/jevmory/actions/workflows/ci.yml/badge.svg)](https://github.com/romiluz13/jevmory/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
+[![Status](https://img.shields.io/badge/status-active-brightgreen)](#status)
+[![License: MIT](https://img.shields.io/badge/License-MIT-informational)](LICENSE)
 
-The viral one-liner:
+Local, zero-dependency memory layer for coding agents. Every remembered
+fact is a **verbatim quote** graded by [TypeSafe Jev](https://typesafe.ai)'s
+calibrated confidence — and every number has a receipt.
 
-```
+```sh
 jevmory audit MEMORY.md
 ```
 
-> your agent's memory has 1 stale line, 1 wrong one, and 1 unsupported one;
-> here are the receipts.
+```
+your memory has 1 stale line, 1 wrong line, 1 unsupported line; 2 keep
 
-## What it does
+LINE  VERDICT      CONF  SUPP  CONTRA  CLAIM
+   5  STALE        0.82  0.34    0.71  The build runs on Bun; bun run build is the…
+   6  WRONG        0.93  0.07    0.93  The test suite runs with pytest.
+   7  UNSUPPORTED  0.85  0.06    0.05  Failed API requests retry up to five times…
 
-Your coding agent (Claude Code, Codex CLI) writes session transcripts to
-disk. jevmory watches, ingests, and grades them:
+receipts: run 1 · 1 api calls · 838 tokens · evidence: 0 facts, 6 statements
+```
 
-1. **Hooks ingest locally** — a `SessionEnd` hook (Claude Code) or `notify`
-   hook (Codex CLI) streams transcript events into a per-project SQLite
-   store at `~/.jevmory/projects/<slug>.db`. Secrets are redacted at rest,
-   before storage. Hooks always exit 0; they can never break a session.
-2. **`jevmory distill` grades while you sleep** — sentence candidates are
-   extracted, deduped, and (only with your opt-in) sent to the Jev API for
-   calibrated judgment: durability, category, significance, support,
-   contradiction. Raw judgments are stored — every fact has receipts.
-3. **`jevmory audit MEMORY.md` checks any memory file** — lines that
-   match a stored fact verbatim are `VERIFIED` deterministically
-   (zero API spend); the rest are graded against the evidence in the
-   store and printed as a screenshot-shaped report:
-   `STALE / WRONG / UNSUPPORTED / KEEP`, with confidence, support,
-   contradiction, and the run receipt.
-4. **`jevmory.md` lands at your project root** — grouped by category,
-   confidence-ordered, every line a verbatim quote with provenance.
-   Sentinel-guarded: never overwritten without your say-so.
-5. **Recall comes to the agent, not the other way round** — a
-   SessionStart hook prints the project's top active facts as plain
-   context (so a resumed or post-compaction session starts warm), and
-   an agent-agnostic MCP server (`jevmory mcp`, stdio, read-only)
-   exposes `status` / `recall` / `fact` to Claude Code, Codex CLI, and
-   Cursor alike. Both are fully local; neither ever grades or egresses.
+## The problem
 
-No LLM generation anywhere: **Jev judges; code selects and composes.**
-Facts are quotes, not summaries — the memory can't hallucinate.
+Your coding agent forgets everything at session end. The usual fix — a
+hand-maintained `MEMORY.md` — rots silently: stale lines, lines nobody
+ever said, lines the project outgrew, and no way to tell which is which.
+jevmory closes both ends: it remembers what was actually said (hooks
+ingest every session locally), and it audits the memory file against
+that evidence, verdict by verdict.
+
+## What it does — four pillars
+
+- 🎯 **Verbatim facts, zero generation** — no LLM generation anywhere.
+  [Jev](https://typesafe.ai) judges; code selects and composes. Facts
+  are quotes with verbatim context, so the memory can't hallucinate.
+- 🔌 **Agent-agnostic** — a one-command Claude Code plugin, an MCP
+  server (`status` / `recall` / `fact`) for Codex CLI, Cursor, and any
+  MCP client, and Codex notify hooks. Same store, same receipts.
+- 🛡️ **Local by architecture** — Python 3 stdlib only, per-project
+  SQLite, secrets redacted at rest before storage, and grading gated
+  behind an explicit per-project opt-in. No opt-in → nothing leaves.
+- 📄 **Receipts for everything** — raw judgments and usage are stored
+  (`runs`/`judgments` tables), so any number in any report traces to
+  the API call that produced it.
 
 ## Quickstart
 
@@ -61,9 +63,9 @@ self-contained; the repo is both marketplace and plugin):
 That one install gives you: a SessionEnd hook that ingests every session
 locally, a SessionStart hook that injects this project's top remembered
 facts into context (fresh sessions, resumes, and post-compaction restarts
-alike), the three read-only MCP memory tools (`status`, `recall`, `fact`),
-the `/jevmory:memory` command, and a `jevmory` CLI on the Bash tool PATH —
-all vendored from the plugin's own copy of the package. Remove it with
+alike), the three read-only MCP memory tools, the `/jevmory:memory`
+command, and a `jevmory` CLI on the Bash tool PATH — all vendored from
+the plugin's own copy of the package. Remove it with
 `/plugin uninstall jevmory`.
 
 **Any MCP agent** (Codex CLI, Cursor, …) — add the stdio memory server:
@@ -94,7 +96,7 @@ jevmory recall                   # the top facts, as the hook injects them
 
 # or opt in to grading (needs $TYPESAFE_API_KEY):
 jevmory init --enable-grading    # per-project opt-in marker
-jevmory distill                    # grade queued candidates
+jevmory distill                  # grade queued candidates
 jevmory audit MEMORY.md          # receipts for every memory line
 jevmory resolve <id>             # answer a contradiction question
 
@@ -105,111 +107,70 @@ jevmory audit MEMORY.md --backend kev   # jaredpalmer/kev on localhost
 Add `jevmory.md` to your project's `.gitignore` if you don't want agent
 memory in version control — it's yours, not the repo's.
 
-Fully offline? Just never run `init --enable-grading`. Everything else —
-ingest, status, scan — is local by architecture (see Privacy).
-
-## Demo (offline, deterministic, zero cost)
+**Try the demo first** — offline, deterministic, zero cost:
 
 ```sh
 python3 demo/run_demo.py
 ```
 
 A planted-error fixture: `demo/MEMORY.md` has 5 memory lines — 3 with
-planted errors (stale, wrong, unsupported) contradicted by the evidence in
-`demo/transcript.jsonl`. Judgments are pinned offline, so the errors are
-guaranteed present and the demo costs nothing:
+planted errors contradicted by the evidence in `demo/transcript.jsonl`.
+Judgments are pinned offline, so the errors are guaranteed present and
+the demo costs nothing. The live `jevmory audit` produces exactly the
+output shown above, with real Jev judgments behind the numbers.
 
-```
-jevmory audit — demo/MEMORY.md
-your memory has 1 stale line, 1 wrong line, 1 unsupported line; 2 keep
+## How it works
 
-LINE  VERDICT      CONF  SUPP  CONTRA  CLAIM
-   5  STALE        0.82  0.34    0.71  The build runs on Bun; bun run build is the…
-   6  WRONG        0.93  0.07    0.93  The test suite runs with pytest.
-   7  UNSUPPORTED  0.85  0.06    0.05  Failed API requests retry up to five times…
-
-receipts: run 1 · 1 api calls · 838 tokens · evidence: 0 facts, 6 statements
-```
-
-The live `jevmory audit` produces exactly this shape, with real Jev
-judgments behind the numbers.
-
-## Privacy
-
-- **What leaves:** redacted candidate quotes (≤600 chars) + verbatim
-  context (≤800 chars) + minimal project context — only during
-  `distill`/`audit` with `$TYPESAFE_API_KEY`
-  set **and** the project opted in (`jevmory init --enable-grading`).
-  With `--backend kev` nothing leaves the machine at all: grading goes
-  to a local wire-compatible server (`$JEVMORY_KEV_ENDPOINT`,
-  default `127.0.0.1:8009`). The opt-in marker is still required —
-  grading is grading, wherever the model runs.
-- **Never:** whole transcripts, transcript metadata (the project context
-  is just the project name — no file paths), or secrets (redacted at
-  rest, before any storage — `sk-*`, AWS keys, GitHub tokens, JWTs, PEM
-  blocks, `password=`/`token=`/`api_key=` assignments, high-entropy
-  hex/base64, bearer tokens → `[redacted:<kind>]`).
-- **Honest caveat:** quotes are verbatim conversation text. Anything
-  non-secret you typed in chat — a file path like
-  `/Users/you/proj/main.py`, an internal hostname, a person's name —
-  stays inside the quote that leaves. The redactor scrubs secrets, not
-  paths; if that matters for your project, stay in local mode.
-- **Fully local mode:** `--offline` / no key / no opt-in — events queue,
-  nothing leaves. No marker → candidates queue; `jevmory status` says so.
-
-## Design decisions (non-negotiable)
-
-1. **Python 3 stdlib only.** No pip deps, ever. Runs anywhere python3 runs.
-2. **Zero LLM generation.** Facts are verbatim quotes with verbatim
-   context. Jev judges; code selects and composes.
-3. **Per-project SQLite store**, WAL + busy_timeout, `schema_version`
-   migrations, FTS retrieval with re-rank.
-4. **Privacy by architecture.** Hooks only ingest locally; grading
-   requires an explicit per-project opt-in marker; redaction at rest
-   before any storage.
-5. **Hooks never break sessions and never die silently.** Ingest is
-   synchronous, always exits 0, and errors surface in `jevmory status`.
-6. **Receipts for everything.** Raw judgments and usage are stored —
-   `runs`/`judgments` tables — so any number in the report can be
-   traced to the API call that produced it.
-
-## Live smoke and fidelity benchmark (lead-run)
-
-The network paths are pinned by budget-capped scripts:
-
-```sh
-TYPESAFE_API_KEY=… python3 scripts/live_smoke.py --probe   # 3 synthetic candidates, 1 request
-TYPESAFE_API_KEY=… python3 scripts/live_smoke.py --distill   # 1 real distill run, capped
-python3 scripts/bench_fidelity.py                           # offline: anchor floor + self-check
-TYPESAFE_API_KEY=… python3 scripts/bench_fidelity.py --live  # real model confusion matrix
+```mermaid
+flowchart LR
+    CC["Claude Code<br/>(SessionEnd hook)"] -->|redacted at rest| DB[("per-project SQLite<br/>+ FTS")]
+    CX["Codex CLI<br/>(notify hook)"] -->|redacted at rest| DB
+    DB -->|"distill: opt-in Jev grading"| J["raw judgments<br/>(receipts)"]
+    J --> F["facts:<br/>verbatim quotes"]
+    F --> MD["jevmory.md<br/>(project root)"]
+    MD -->|audit| R["STALE / WRONG /<br/>UNSUPPORTED / KEEP"]
+    DB -->|"SessionStart recall"| CTX["agent context"]
+    DB -->|"MCP: status · recall · fact"| MCP["any MCP client"]
 ```
 
-The smoke is hard-capped on requests (`--cap`, default 40, PLAN's smoke
-ceiling); `BudgetExhausted` is a `JevError`, so the run row closes and
-events stay queued — the smoke cannot overspend. Live-verified against
-the real API: probe (auth, envelope, strict parse, usage accounting), a
-capped distill over real transcripts, and a live audit that caught a
-planted wrong line with receipts in the store's `runs`/`judgments`
-tables.
+Hooks ingest locally and always exit 0 — they can never break a session.
+`distill` extracts and dedupes sentence candidates, then (only with your
+opt-in) grades them: durability, category, significance, support,
+contradiction. `audit` anchors lines that match a stored fact verbatim as
+`VERIFIED` deterministically (zero API spend) and grades the rest against
+the store's evidence. `jevmory.md` lands at the project root — grouped by
+category, confidence-ordered, sentinel-guarded against silent overwrites.
 
-The fidelity benchmark runs a planted-truth fixture (3 verbatim truths,
-a stale line quoting a superseded fact, a one-word mutation, an
-unsupported claim): offline it proves the deterministic anchor stage —
-3/3 verbatim recall, zero false anchors — and self-checks the full
-pipeline against an ideal scripted model; `--live` measures the real
-model's end-to-end confusion matrix on the same fixture.
+Design laws and domain model: [docs/DOMAIN.md](docs/DOMAIN.md).
+
+## Configuration & privacy
+
+- **Fully local mode** — just never run `init --enable-grading`.
+  Everything else (ingest, status, scan, recall, MCP) is local by
+  architecture. No marker → candidates queue; `jevmory status` says so.
+- **What leaves, and what never does** — the exact egress surface, the
+  redaction list, and the honest caveat about verbatim quotes:
+  [docs/PRIVACY.md](docs/PRIVACY.md).
+- **Closed networks** — `--backend kev` grades against a local
+  wire-compatible server (`$JEVMORY_KEV_ENDPOINT`, default
+  `127.0.0.1:8009`); no key, no egress, opt-in still required.
+- **Benchmarks** — budget-capped live smoke and the planted-truth
+  fidelity benchmark: [docs/benchmarks/live-smoke.md](docs/benchmarks/live-smoke.md).
 
 ## Status
 
-595 offline tests (`python3 -m pytest tests/ -q`) — no network, no API
-key, FakeJev including adversarial mode. Modules M0–M7 complete;
-pipeline live-verified against the real Jev API (probe, capped distill,
-audit). v0.2: two-stage audit with deterministic `VERIFIED` anchoring,
-vintage receipts (`said … · verified …`), and the `kev` local grading
-backend. v0.3: plug-and-play — a self-contained Claude Code plugin
-(marketplace + hooks + MCP tools + command), an agent-agnostic MCP
+**Active.** 595 offline tests (the same `python -m unittest discover`
+CI runs on 3.10–3.13) — no network, no API key, FakeJev including
+adversarial mode. Modules M0–M7 complete; pipeline live-verified against
+the real Jev API (probe, capped distill, audit). v0.2: two-stage audit
+with deterministic `VERIFIED` anchoring, vintage receipts, and the `kev`
+local grading backend. v0.3: plug-and-play — a self-contained Claude Code
+plugin (marketplace + hooks + MCP tools + command), an agent-agnostic MCP
 server for Codex/Cursor, and SessionStart recall injection; both plugin
 manifests pass `claude plugin validate --strict`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved, and
+[CHANGELOG.md](CHANGELOG.md) for history.
 
 ## License
 
