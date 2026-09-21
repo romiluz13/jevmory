@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "jevmory": {
+      "command": "python3",
+      "args": ["-m", "jevmory.mcp"],
+      "env": {
+        "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}"
+      }
+    }
+  }
+}

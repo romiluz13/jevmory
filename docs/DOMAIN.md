@@ -20,7 +20,9 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 | **Verdict** | The decision for a Fact: `keep`, `supersede`, `retire`, `ask` (low confidence → surface to human). |
 | **Audit** | Grading an *external* memory file (e.g. Claude Code's `MEMORY.md`) line by line: still true / stale / wrong / unsupported, with receipts. |
 | **jevmory.md** | The published memory file at project root — the only artifact agents read. Facts grouped by category, sorted by significance × confidence, each with a receipt line. |
-| **Hook** | The integration that triggers ingest when an agent session ends (Claude Code `SessionEnd`, Codex `notify`). |
+| **Hook** | The integration that triggers ingest when an agent session ends (Claude Code `SessionEnd`, Codex `notify`) — and recall when a session starts (Claude Code `SessionStart`): the project's top active Facts printed as context, verbatim, confidence-ordered. |
+| **Recall** | Read-only retrieval of what the store remembers: the SessionStart context injection, the `jevmory recall` rendering, and the MCP `recall` tool. Recall never grades, never writes, never leaves the machine. |
+| **MCP server** | The agent-agnostic surface (`jevmory mcp`, stdio JSON-RPC): three read-only tools — `status`, `recall`, `fact` — so any MCP client (Claude Code, Codex CLI, Cursor) can query the store without agent-specific wiring. |
 
 ## Invariants (the domain's laws)
 
@@ -53,4 +55,4 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 - **judgment** — the Jev client: fan-out batching, budget math, retry/backoff, typed answers, fake client for tests.
 - **memory** — the store: SQLite schema, FTS5 lookup, Fact lifecycle, dedupe/conflict bookkeeping.
 - **distill** — the consolidation engine: the pipeline that composes judgments into verdicts and rewrites jevmory.md.
-- **integration** — CLI + hooks (Claude Code `SessionEnd`, Codex `notify`) + `install` command.
+- **integration** — CLI + hooks (Claude Code `SessionEnd` ingest, `SessionStart` recall; Codex `notify`) + `install` command + the MCP server + the Claude Code plugin packaging (the repo is both marketplace and plugin; the vendored package runs off `${CLAUDE_PLUGIN_ROOT}`, no pip install).

@@ -36,6 +36,12 @@ disk. jevmory watches, ingests, and grades them:
 4. **`jevmory.md` lands at your project root** — grouped by category,
    confidence-ordered, every line a verbatim quote with provenance.
    Sentinel-guarded: never overwritten without your say-so.
+5. **Recall comes to the agent, not the other way round** — a
+   SessionStart hook prints the project's top active facts as plain
+   context (so a resumed or post-compaction session starts warm), and
+   an agent-agnostic MCP server (`jevmory mcp`, stdio, read-only)
+   exposes `status` / `recall` / `fact` to Claude Code, Codex CLI, and
+   Cursor alike. Both are fully local; neither ever grades or egresses.
 
 No LLM generation anywhere: **Jev judges; code selects and composes.**
 Facts are quotes, not summaries — the memory can't hallucinate.
@@ -43,6 +49,35 @@ Facts are quotes, not summaries — the memory can't hallucinate.
 ## Quickstart
 
 Requires Python ≥3.10 and nothing else — stdlib only, no pip deps.
+
+**Plug-and-play with Claude Code** (no pip install — the plugin is
+self-contained; the repo is both marketplace and plugin):
+
+```sh
+/plugin marketplace add romiluz13/jevmory
+/plugin install jevmory@jevmory
+```
+
+That one install gives you: a SessionEnd hook that ingests every session
+locally, a SessionStart hook that injects this project's top remembered
+facts into context (fresh sessions, resumes, and post-compaction restarts
+alike), the three read-only MCP memory tools (`status`, `recall`, `fact`),
+the `/jevmory:memory` command, and a `jevmory` CLI on the Bash tool PATH —
+all vendored from the plugin's own copy of the package. Remove it with
+`/plugin uninstall jevmory`.
+
+**Any MCP agent** (Codex CLI, Cursor, …) — add the stdio memory server:
+
+```sh
+jevmory mcp        # or: python3 -m jevmory.mcp
+```
+
+Point your agent at it as a stdio MCP server
+(`command: python3`, `args: ["-m", "jevmory.mcp"]`). Three read-only,
+fully local tools; no API key, no egress — grading stays in the CLI
+where the opt-in gate lives.
+
+**From source:**
 
 ```sh
 git clone https://github.com/romiluz13/jevmory && cd jevmory
@@ -55,6 +90,7 @@ jevmory install --agent codex    # prints the Codex notify snippet (--yes patche
 # stay fully local (nothing ever leaves):
 jevmory ingest --scan            # finds this project's transcripts and ingests
 jevmory status                   # queued candidates, last ingest, errors
+jevmory recall                   # the top facts, as the hook injects them
 
 # or opt in to grading (needs $TYPESAFE_API_KEY):
 jevmory init --enable-grading    # per-project opt-in marker
@@ -165,12 +201,15 @@ model's end-to-end confusion matrix on the same fixture.
 
 ## Status
 
-553 offline tests (`python3 -m pytest tests/ -q`) — no network, no API
+595 offline tests (`python3 -m pytest tests/ -q`) — no network, no API
 key, FakeJev including adversarial mode. Modules M0–M7 complete;
 pipeline live-verified against the real Jev API (probe, capped distill,
 audit). v0.2: two-stage audit with deterministic `VERIFIED` anchoring,
 vintage receipts (`said … · verified …`), and the `kev` local grading
-backend.
+backend. v0.3: plug-and-play — a self-contained Claude Code plugin
+(marketplace + hooks + MCP tools + command), an agent-agnostic MCP
+server for Codex/Cursor, and SessionStart recall injection; both plugin
+manifests pass `claude plugin validate --strict`.
 
 ## License
 

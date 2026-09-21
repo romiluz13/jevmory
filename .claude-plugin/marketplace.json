@@ -1,0 +1,22 @@
+{
+  "name": "jevmory",
+  "owner": {
+    "name": "romiluz13",
+    "url": "https://github.com/romiluz13"
+  },
+  "description": "jevmory: local, zero-dependency coding-agent memory — the repo is both the marketplace and the plugin",
+  "plugins": [
+    {
+      "name": "jevmory",
+      "source": "./",
+      "description": "Local, zero-dependency coding-agent memory: session-start recall of Jev-graded verbatim facts, automatic session-end ingest, and read-only MCP memory tools. No API key needed to install; grading is opt-in.",
+      "version": "0.3.0",
+      "category": "memory",
+      "tags": ["memory", "mcp", "hooks", "local-first", "agent-agnostic"],
+      "author": {
+        "name": "romiluz13",
+        "url": "https://github.com/romiluz13"
+      }
+    }
+  ]
+}

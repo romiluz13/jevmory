@@ -1,0 +1,11 @@
+#!/bin/sh
+# jevmory plugin wrapper: runs the vendored package from the plugin
+# root, so the CLI works with no pip install. Claude Code puts this
+# bin/ directory on the Bash tool PATH when the plugin is enabled.
+#
+# A pip/pipx-installed jevmory is NOT shadowed unless PYTHONPATH wins;
+# the plugin copy is the one matched to this plugin's version, which
+# is the intended behavior.
+set -e
+PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+exec env PYTHONPATH="$PLUGIN_ROOT${PYTHONPATH:+:$PYTHONPATH}" python3 -m jevmory "$@"

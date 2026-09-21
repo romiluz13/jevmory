@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-21
+
+Plug-and-play packaging: a self-contained Claude Code plugin, an
+agent-agnostic MCP server, and session-start recall injection. Same
+mission invariants — stdlib only, zero LLM generation, local by
+architecture.
+
+### Added
+
+- **Claude Code plugin** (`.claude-plugin/`, `hooks/`, `.mcp.json`,
+  `commands/`, `bin/`): the repo is both the marketplace and the
+  plugin — `/plugin marketplace add romiluz13/jevmory` then
+  `/plugin install jevmory@jevmory`. No pip install: hooks run the
+  vendored package via `${CLAUDE_PLUGIN_ROOT}` on PYTHONPATH, the MCP
+  server starts from the same copy, and `bin/jevmory` puts the CLI on
+  the Bash tool PATH. Both manifests pass `claude plugin validate
+  --strict`.
+- **Agent-agnostic MCP server** (`jevmory mcp` / `python3 -m
+  jevmory.mcp`): hand-rolled line-delimited JSON-RPC 2.0 over stdio —
+  no SDK, stdlib only. Three read-only, fully local tools: `status`
+  (store stats), `recall` (FTS search with vintage receipts), `fact`
+  (one fact in full, with contradiction partners). Project resolution:
+  tool argument > `$JEVMORY_PROJECT` > server cwd. The server never
+  grades and never egresses; tool errors return `isError` results, the
+  protocol survives crashing tools (`-32603`).
+- **SessionStart recall** (`python3 -m jevmory.recall`, wired as a
+  plugin hook and `jevmory recall`): prints the project's top active
+  facts as plain context at every session start — fresh, resumed, and
+  post-compaction. Confidence-ordered, capped at 12 lines, verbatim
+  quotes with vintage receipts; silent on a store with nothing to say;
+  same never-die contract as the ingest hook (always exits 0).
+- `python3 -m jevmory` module entry; `recall` and `mcp` CLI
+  subcommands; plugin gates in `tests/test_packaging.py` (manifest
+  versions agree with the package, hooks reference real modules,
+  `bin/jevmory` is executable).
+
 ## [0.2.0] - 2026-09-21
 
 Two-stage audit with deterministic verification, vintage receipts, a

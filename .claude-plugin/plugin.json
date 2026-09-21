@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "jevmory",
+  "displayName": "jevmory",
+  "version": "0.3.0",
+  "description": "Local, zero-dependency coding-agent memory: Jev-graded verbatim facts from past sessions, injected at session start and searchable as MCP tools. Read-only over stdio, fully local.",
+  "author": {
+    "name": "romiluz13",
+    "url": "https://github.com/romiluz13"
+  },
+  "homepage": "https://github.com/romiluz13/jevmory",
+  "repository": "https://github.com/romiluz13/jevmory",
+  "license": "MIT",
+  "keywords": ["memory", "agent-memory", "mcp", "hooks", "local-first"]
+}

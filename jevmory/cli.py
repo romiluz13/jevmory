@@ -80,8 +80,10 @@ from jevmory.judgment.client import (
 )
 from jevmory.judgment.errors import JevError
 from jevmory.judgment.fake import MODE_NORMAL, FakeJev
+from jevmory.mcp import serve as mcp_serve
 from jevmory.memory.facts import ask_facts
 from jevmory.memory.schema import connect, migrate
+from jevmory.recall import render_recall
 
 # Payload keys the hook recognizes (kept in sync with jevmory.hook).
 HOOK_CWD_KEYS = ("cwd", "project_dir", "working_directory", "workspace", "workspace_root")
@@ -827,6 +829,38 @@ def _cmd_hook(args, stdin_text: str | None) -> int:
     return run_hook(getattr(args, "hook_args", None) or [], text)
 
 
+# --- recall / mcp ---------------------------------------------------------------
+
+
+def _cmd_recall(args, stdin_text: str | None) -> int:
+    """Print the SessionStart recall text on demand (what the hook injects)."""
+
+    project = _project_dir(args.project)
+    text = render_recall(project, limit=args.limit)
+    if text is None:
+        print(f"nothing remembered yet for {project}")
+        print("sessions ingested by the hooks build the store; try jevmory status")
+        return 0
+    print(text)
+    return 0
+
+
+def _cmd_mcp(args, stdin_text: str | None) -> int:
+    """Run the agent-agnostic MCP server on stdio (python3 -m jevmory.mcp).
+
+    stdin_text is deliberately ignored: the wire protocol owns stdin
+    from here on, and it must read the real stream line by line.
+    """
+
+    import sys as _sys
+
+    try:
+        mcp_serve(_sys.stdin, _sys.stdout)
+    except BrokenPipeError:  # client went away: exit quietly
+        return 0
+    return 0
+
+
 # --- parser --------------------------------------------------------------------
 
 
@@ -916,6 +950,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--project", metavar="DIR")
     p.set_defaults(func=_cmd_status)
+
+    p = sub.add_parser(
+        "recall",
+        help="top remembered facts as context text (what the hook injects)",
+    )
+    p.add_argument("--limit", type=int, default=12, help="max facts (default 12)")
+    p.add_argument("--project", metavar="DIR")
+    p.set_defaults(func=_cmd_recall)
+
+    p = sub.add_parser(
+        "mcp",
+        help="run the MCP memory server on stdio (Claude/Codex/Cursor tools)",
+    )
+    p.set_defaults(func=_cmd_mcp)
 
     p = sub.add_parser(
         "install", help="print agent hook config (patches only with --yes)"
