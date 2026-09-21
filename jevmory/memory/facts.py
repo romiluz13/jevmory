@@ -3,7 +3,7 @@
 Everything here works on one project's store connection (``connect`` +
 ``migrate`` from ``jevmory.memory.schema``); DDL itself stays in
 schema.py (review R7). The operations are the storage primitives the
-dream engine (M5) composes into verdicts:
+distill engine (M5) composes into verdicts:
 
 - **add** an active fact (confidence = the one formula, receipts land
   in ``judgments`` via ``record_judgment``);
@@ -15,7 +15,8 @@ dream engine (M5) composes into verdicts:
 - **lifecycle**: duplicate → ``bump_support``; destructive verdicts →
   ``supersede`` / ``retire`` (row KEPT for provenance, removed from
   FTS); low-confidence conflict → ``mark_ask`` (+ ``bump_ask`` counting
-  consecutive unresolved dreams; expiry disposition is M5's call).
+  consecutive unresolved distills; expiry disposition is M5's call);
+  audit stage-1 anchor hit → ``mark_verified`` (vintage marker, v3).
 
 FTS maintenance rule (PLAN "FTS maintenance"): only ACTIVE facts are
 ever indexed in ``facts_fts`` — retire/supersede delete the FTS row via
@@ -55,7 +56,7 @@ STATUS_ASK = "ask"
 _FACT_COLUMNS = (
     "id, project, claim, context, category, significance, confidence, "
     "status, source_event_ids, support_count, ask_seen_count, "
-    "created_at, updated_at, last_supported_at"
+    "created_at, updated_at, last_supported_at, verified_at"
 )
 
 
@@ -81,6 +82,7 @@ class Fact:
     created_at: str
     updated_at: str
     last_supported_at: str | None
+    verified_at: str | None = None  # v3 vintage marker; None = never audited
 
 
 def _row_to_fact(row: sqlite3.Row | tuple) -> Fact:
@@ -99,6 +101,7 @@ def _row_to_fact(row: sqlite3.Row | tuple) -> Fact:
         created_at=row[11],
         updated_at=row[12],
         last_supported_at=row[13],
+        verified_at=row[14],
     )
 
 
@@ -137,7 +140,7 @@ def contradicts_partners(
 ) -> list[Fact]:
     """All facts this one contradicts (``contradicts`` links, oldest first).
 
-    A fact can carry several such links: the dream engine keeps the
+    A fact can carry several such links: the distill engine keeps the
     contradicts edge for every over-gate pair (review S2), not just the
     pair whose action won. ``resolve`` acts on ALL of them.
     """
@@ -197,7 +200,7 @@ def record_judgment(
 def start_run(
     conn: sqlite3.Connection, *, project: str, kind: str, now: str | None = None
 ) -> int:
-    """Open a run row (kind: dream | audit); returns its id."""
+    """Open a run row (kind: distill | audit); returns its id."""
     with conn:
         cursor = conn.execute(
             "INSERT INTO runs (project, kind, started_at) VALUES (?, ?, ?)",
@@ -330,6 +333,32 @@ def add_link(
         )
 
 
+def mark_verified(
+    conn: sqlite3.Connection, fact_id: int, *, now: str | None = None
+) -> Fact:
+    """Stage-1 audit write-back (schema v3): stamp ``verified_at``.
+
+    The deterministic anchor check confirmed this fact's claim verbatim
+    against a memory line — a string-equality receipt, not a model
+    judgment, so the timestamp is a hard provenance mark. Never over-
+    writes a fact's status or confidence; NULL -> timestamp is the only
+    intended transition (a fact re-verified later keeps the latest
+    stamp, matching "when did I last check this").
+    """
+    fact = get_fact(conn, fact_id)
+    if fact is None:
+        raise ValueError(f"no fact {fact_id}")
+    timestamp = now or _utc_now()
+    with conn:
+        conn.execute(
+            "UPDATE facts SET verified_at = ?, updated_at = ? WHERE id = ?",
+            (timestamp, timestamp, fact_id),
+        )
+    updated = get_fact(conn, fact_id)
+    assert updated is not None
+    return updated
+
+
 def _remove_from_fts(conn: sqlite3.Connection, fact: Fact) -> None:
     """External-content FTS5 delete — must carry the EXACT indexed claim."""
     conn.execute(
@@ -444,7 +473,7 @@ def reactivate(
 def bump_ask(
     conn: sqlite3.Connection, fact_id: int, now: str | None = None
 ) -> int:
-    """One more dream seen with this ask unresolved; returns the new count.
+    """One more distill seen with this ask unresolved; returns the new count.
 
     Only ask-status facts accumulate; other statuses are a no-op
     (returns their current count). Expiry disposition is the engine's

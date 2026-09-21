@@ -22,7 +22,12 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from jevmory.audit.rules import LineVerdict, REVIEW, count_dispositions
+from jevmory.audit.rules import (
+    VERIFIED,
+    LineVerdict,
+    REVIEW,
+    count_dispositions,
+)
 
 # Terminal layout constants (presentation, not decision thresholds).
 _CLAIM_WIDTH = 44  # claim column width before ellipsis
@@ -68,15 +73,19 @@ class AuditReport:
             for keyword, noun in phrases
             if self.counts.get(keyword)
         ]
+        verified = self.counts.get(VERIFIED, 0)
         if not problems:
-            return (
+            summary = (
                 f"all {len(self.lines)} lines hold up — "
                 "nothing stale, nothing wrong"
             )
-        summary = "your memory has " + ", ".join(problems)
-        keeps = sum(1 for v in self.lines if v.keyword == "KEEP")
-        if keeps:
-            summary += f"; {keeps} keep"
+        else:
+            summary = "your memory has " + ", ".join(problems)
+            keeps = sum(1 for v in self.lines if v.keyword == "KEEP")
+            if keeps:
+                summary += f"; {keeps} keep"
+        if verified:
+            summary += f"; {verified} verified verbatim (no api call)"
         return summary
 
 
@@ -159,6 +168,8 @@ def render_json(report: AuditReport) -> str:
                 "confidence": verdict.confidence,
                 "supported": verdict.supported,
                 "contradicted": verdict.contradicted,
+                "anchored": verdict.anchored,
+                "anchor_fact_id": verdict.anchor_fact_id,
             }
             for verdict in report.lines
         ],
@@ -176,10 +187,18 @@ def build_report(
     evidence_facts: int = 0,
     evidence_statements: int = 0,
 ) -> AuditReport:
-    """Assemble an ``AuditReport`` (counts derived, never hand-passed)."""
+    """Assemble an ``AuditReport`` (counts derived, never hand-passed).
+
+    Lines are stored in FILE ORDER regardless of how the engine
+    accumulated them — stage-1 anchored verdicts and stage-2 batches
+    arrive interleaved, but the report always reads top-to-bottom like
+    the memory file.
+    """
     return AuditReport(
         memory_file=memory_file,
-        lines=tuple(verdicts),
+        lines=tuple(
+            sorted(verdicts, key=lambda verdict: verdict.line.number)
+        ),
         run_id=run_id,
         api_calls=api_calls,
         usage_tokens=usage_tokens,

@@ -1,6 +1,6 @@
 # Competitive landscape: Jev-based coding-agent memory (and the market around it)
 
-Research date: 2026-09-21. Compiled by the lead from five independent streams: a full close-read of the compaction wave (GLM), a close-read of six dev-tool repos (subagent A), a census of the entire awesome-jev ecosystem — 959 deduplicated entries (subagent B), an open-replica compatibility assessment (subagent C), and a devil's-advocate market review including non-Jev competitors (Kimi). Raw evidence: `.team/glm/research-compaction-wave.md`, `.team/kimi/findings-competitive-review.md`, `.team/lead/evidence-digest.md`, `.team/lead/rombot-answer-2026-09-21.md`.
+Research date: 2026-09-21. Compiled by the lead from five independent streams: a full close-read of the compaction wave (GLM), a close-read of six dev-tool repos (subagent A), a census of the entire awesome-jev ecosystem — 959 deduplicated entries (subagent B), an open-replica compatibility assessment (subagent C), and a devil's-advocate market review including non-Jev competitors (Kimi). Raw evidence: `.team/glm/research-compaction-wave.md`, `.team/kimi/findings-competitive-review.md`, `.team/lead/evidence-digest.md`, `.team/lead/rombot-answer-2026-09-21.md`. Same-day refresh: a 30-day market scan (last30days engine, 102 evidence items across 7 sources + web supplements), synthesized in §9 — raw evidence `~/Documents/Last30Days/ai-agent-memory-tools-raw-v3.md`.
 
 ## Verdict
 
@@ -115,3 +115,37 @@ Pattern: the ecosystem built routers, gates, compactors, and judges for the *ins
 - Is Jev grading measurably better than a cheap LLM judge for fact-worth-remembering? (Fidelity benchmark, recommendation 5.)
 - Do developers care enough about memory *correctness* to adopt a verification tool? (Unproven demand; the audit demo is the test.)
 - Receipt rot rate on real refactoring workloads. (Instrument during the memongo dogfood.)
+
+## 9. Same-day refresh: 30-day market scan (2026-09-21, last30days engine + web supplements)
+
+102 evidence items across 7 sources (Reddit 29, X 30, HN 27, Bluesky 7, GitHub 2, YouTube 2, jobs 5) + close-read supplements. What the last 30 days added to the picture above:
+
+### 9a. New entrants since the morning census
+
+| Project | Signal | Read vs jevmory |
+|---|---|---|
+| **OKF Agent Memory** (Google OKF v0.2) | HN 81 pts; git-native memory, embedded MCP server, sub-300µs BM25 retrieval, claims 80% token reduction | **Closest non-Jev mechanism match.** Shares git-native + file-first + local; differs on retrieval (BM25 vs graded facts) and has no verification layer. Its own benchmark (third-party, via deja) shows the weak spot: 18/100 hit@1 — retrieval quality is their open problem, exactly what graded consolidation addresses. |
+| **memoryfields** (calpaterson) | HN 191 pts — the loudest signal in the scan; essay, not (yet) a product | **Philosophical competition for the same audience.** "Memory should be a data format, not a multi-stage pipeline": markdown pages + optional SQLite vector index, open zipfile spec, four design decisions (prose not chunks, semantic jump not graph walking, more model less mechanism, open format). Directly validates jevmory's receipts thesis independently: "memories work best when they include citations, ideally in the form of URLs… helps agents fact check outdated or otherwise suspect material." A jevmory.md export would satisfy their format's spirit; their audience is jevmory's early adopter pool. |
+| **Friday** | Show HN (9 pts): self-hosted MCP persistent memory | Another local-first entrant; small. |
+| **OpenContext** | project-local MCP memory | Fragmentation continues per-project, not cross-project. |
+| **Itsuki** | cross-tool shared memory | The cross-agent pitch is spreading beyond claude-mem. None graded. |
+| **akitaonrails/ai-memory** | Rust, ~7.2k★ | Yet another store; no receipts, no audit. |
+| **Mnemosyne for Hermes, agentos** | local quickstart; TS "cognitive memory" | Long tail keeps thickening — the category is now default, the verification niche stays empty. |
+
+Scale checks: mem0 at ~66k★ (765 open issues), claude-mem at ~94k★ (245 open issues) — both continue shipping September updates. The category leaders are absorbing churn; the correctness niche remains unclaimed.
+
+### 9b. The three signals that change strategy
+
+1. **Memory-as-file-format is now a movement.** memoryfields (191 pts) argues precisely jevmory's architecture: files on disk, low mechanism, citations for future verification passes. This is tailwind, not threat — the strongest HN thread of the window is people asking for exactly what jevmory.md is. Positioning corollary: keep `jevmory.md` a plain readable file (already invariant), and make audit (the verification pass the essay calls for) the headline capability.
+2. **The planted-false-memory security angle arrived.** A circulating demonstration (TechnikaNova) plants false memories in agent memory files and shows agents acting on them: "Memory is a persistence mechanism. Treat it with the same suspicion as user input… Audit everything. Inputs. Outputs. Memory. Tool calls." This is the strongest external validation yet of the audit-layer-is-the-product verdict: memory poisoning is now a named attack class, and `jevmory audit` is a defense that exists today.
+3. **Benchmarks became the currency.** OKF publishes third-party numbers; agentmemory markets "#1 based on real-world benchmarks." The category has turned to measurable claims. jevmory still has zero public benchmark — recommendation 5 (fidelity benchmark vs planted stale/wrong/unsupported lines) moves from "before PyPI" to "before anyone believes anything."
+
+### 9c. Community pain, unchanged
+
+The 58-project-folders thread (r/ClaudeAI, 48 comments): every project is its own memory silo, no consolidation, no cross-project recall. Same pain the census found; nobody new solved it. One r/AI_Agents member is already "testing Jev as a subconscious helper for my AI agent" — the substrate's use for memory is surfacing at user level, not just in the awesome-jev census.
+
+### 9d. Deltas to the verdict and threat matrix
+
+- **Threat 3 (the window) tightens.** OKF, memoryfields, Friday, OpenContext, Itsuki all shipped into the window during the scan period. The "persistent cross-session cross-agent coding memory with verification" slot is still empty, but the crowd at the door doubled.
+- **Threat 4 (unproven differentiator) now cuts both ways.** kev's benchmark tooling + published Jev comparison (Kev-9B trails hosted Jev ~4.5 pts on new-source dev) means the "is Jev grading worth it" question is answerable with kev's own harness, for free, locally.
+- **Positioning 1 (lead with the audit) is externally reinforced** — by the poisoning demo (9b.2) and the memoryfields citation thesis (9a). The v0.2 build plan operationalizes this: two-stage audit (deterministic anchor check before any model call), vintage markers (said-then vs is-now), and the fidelity benchmark are all audit-first moves.

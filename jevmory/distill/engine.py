@@ -1,4 +1,4 @@
-"""Dream engine (PLAN M5): one ``dream`` run over the pending queue.
+"""Distill engine (PLAN M5): one ``distill`` run over the pending queue.
 
 Composes the M1-M4 layers into a single deterministic pass:
 
@@ -21,13 +21,13 @@ Composes the M1-M4 layers into a single deterministic pass:
    priority was removed in dogfood round 1 (F1): on real codex corpora
    user lines are chitchat and commands while durable knowledge lives
    in assistant statements, so role priority just burned budget. The
-   cap counts candidate groups (``MAX_CANDIDATES_PER_DREAM``); events
+   cap counts candidate groups (``MAX_CANDIDATES_PER_DISTILL``); events
    past it stay pending (``events_deferred``). Events whose statements
    yield no candidates are graded too — an empty yield is deterministic
    and must not re-queue forever.
-4. **Ask expiry** — every ask open when the dream begins is bumped;
-   at ``ASK_EXPIRY_DREAMS`` it expires keep-old (``dream.resolve``).
-   An ask created BY this dream is not counted for it.
+4. **Ask expiry** — every ask open when the distill begins is bumped;
+   at ``ASK_EXPIRY_DISTILLS`` it expires keep-old (``distill.resolve``).
+   An ask created BY this distill is not counted for it.
 5. **Phase A** — plan/ask/verdict per group; receipts under stable
    question keys, one per (candidate, question).
 6. **Survivor routing** — code-level duplicate (zero Jev) bumps
@@ -62,9 +62,9 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
-from jevmory.dream.batch import PairPlan, plan_phase_b
-from jevmory.dream.resolve import bump_and_expire_asks
-from jevmory.dream.rules import (
+from jevmory.distill.batch import PairPlan, plan_phase_b
+from jevmory.distill.resolve import bump_and_expire_asks
+from jevmory.distill.rules import (
     ACTION_ASK,
     ACTION_DUPLICATE,
     ACTION_SUPERSEDE,
@@ -81,7 +81,7 @@ from jevmory.dream.rules import (
     pair_action,
     phase_a_verdict,
 )
-from jevmory.dream.writer import AskPair
+from jevmory.distill.writer import AskPair
 from jevmory.ingestion.eventlog import optin_path
 from jevmory.ingestion.extract import Candidate, candidates_from_statements
 from jevmory.ingestion.models import Statement
@@ -106,7 +106,7 @@ from jevmory.memory.facts import (
 )
 from jevmory.thresholds import (
     CONTRADICTION_GATE,
-    MAX_CANDIDATES_PER_DREAM,
+    MAX_CANDIDATES_PER_DISTILL,
     PAIR_SIGNIFICANCE_GATE,
 )
 
@@ -128,8 +128,8 @@ class GradingNotEnabledError(Exception):
 
 
 @dataclass(frozen=True)
-class DreamReport:
-    """What one dream did, plus the store state for the writer."""
+class DistillReport:
+    """What one distill did, plus the store state for the writer."""
 
     run_id: int | None
     api_calls: int
@@ -155,7 +155,7 @@ class DreamReport:
     sessions_by_fact: Mapping[int, int] = field(default_factory=dict)
 
 
-def run_dream(
+def run_distill(
     conn: sqlite3.Connection,
     *,
     project: str,
@@ -164,10 +164,10 @@ def run_dream(
     project_context: Mapping[str, Any] | None = None,
     home: str | os.PathLike[str] | None = None,
     now: str | None = None,
-    max_candidates: int | None = MAX_CANDIDATES_PER_DREAM,
+    max_candidates: int | None = MAX_CANDIDATES_PER_DISTILL,
     enforce_optin: bool = True,
-) -> DreamReport:
-    """Run one dream over the project's pending queue. See module docstring.
+) -> DistillReport:
+    """Run one distill over the project's pending queue. See module docstring.
 
     ``enforce_optin=False`` is the CLI's ``--offline`` path: simulated
     grading (FakeJev) never calls the API, so the opt-in gate — which
@@ -211,7 +211,7 @@ def run_dream(
     if not selected and not ask_facts(conn, project):
         # zero spend: no run row, no receipts, store state as-is
         facts = tuple(active_facts(conn, project))
-        return DreamReport(
+        return DistillReport(
             run_id=None,
             api_calls=0,
             usage_tokens=0,
@@ -233,7 +233,7 @@ def run_dream(
             sessions_by_fact=_sessions_by_fact(conn, facts),
         )
 
-    run_id = start_run(conn, project=project, kind="dream", now=stamp)
+    run_id = start_run(conn, project=project, kind="distill", now=stamp)
     api_calls = 0
     usage_tokens = 0
     facts_added: list[int] = []
@@ -476,7 +476,7 @@ def run_dream(
         now=stamp,
     )
     final_facts = tuple(active_facts(conn, project))
-    return DreamReport(
+    return DistillReport(
         run_id=run_id,
         api_calls=api_calls,
         usage_tokens=usage_tokens,

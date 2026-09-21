@@ -1,4 +1,4 @@
-"""SQLite schema (v2) for the per-project store — the ONLY home of DDL.
+"""SQLite schema (v3) for the per-project store — the ONLY home of DDL.
 
 Every CREATE TABLE / CREATE VIRTUAL TABLE / CREATE INDEX statement for
 the store lives here (review R7); ``jevmory.ingestion.eventlog`` writes
@@ -10,8 +10,14 @@ the events table but must not define it (asserted by
 - ``facts``     — active graded statements with receipts (M3/M5)
 - ``fact_links``— duplicate_of / supersedes / contradicts edges
 - ``judgments`` — verbatim Jev answers, the actual receipts (F7.1)
-- ``runs``      — one row per dream/audit run, stats JSON
+- ``runs``      — one row per distill/audit run, stats JSON
 - ``facts_fts`` — FTS5 index over active facts' claims (external content)
+
+v3 (2026-09-21): ``facts.verified_at`` — the vintage marker. Stage 1
+of the two-stage audit (deterministic anchor match) writes back the
+timestamp when a memory line is confirmed verbatim against its stored
+fact; the writer renders said-then vs verified-now from it. NULL means
+"never audited" — the default, never a guess.
 
 ``schema_version`` is created by the FIRST migration, with an explicit
 branch for v1-era databases ("events table exists, no version row",
@@ -33,7 +39,7 @@ import os
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_VERSION_DDL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -70,7 +76,8 @@ CREATE TABLE IF NOT EXISTS facts (
   ask_seen_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  last_supported_at TEXT
+  last_supported_at TEXT,
+  verified_at TEXT                        -- v3 vintage marker; NULL = never audited
 )
 """
 
@@ -160,9 +167,17 @@ def current_version(conn: sqlite3.Connection) -> int | None:
 
 
 def create_all(conn: sqlite3.Connection) -> None:
-    """Create every v2 table/index (IF NOT EXISTS — safe on any store)."""
+    """Create every v3 table/index (IF NOT EXISTS — safe on any store)."""
     for ddl in _ALL_DDL:
         conn.execute(ddl)
+
+
+def _column_exists(
+    conn: sqlite3.Connection, table: str, column: str
+) -> bool:
+    return any(
+        row[1] == column for row in conn.execute(f"PRAGMA table_info({table})")
+    )
 
 
 def _stamp(conn: sqlite3.Connection, version: int) -> None:
@@ -173,11 +188,12 @@ def migrate(conn: sqlite3.Connection) -> int:
     """Bring a store up to ``SCHEMA_VERSION``; returns the applied version.
 
     Branches:
-    - fresh store (no events table, no version row) -> create all, stamp 2;
+    - fresh store (no version row) -> create all v3 tables, stamp 3;
     - v1-era store (events table exists, no version row) -> keep the v1
       events table as-is (nullable text; see module docstring), create the
-      v2 tables around it, stamp 2;
-    - older stamped version -> forward migrations (none beyond 2 yet);
+      v3 tables around it, stamp 3;
+    - v2 store -> ALTER TABLE facts ADD COLUMN verified_at (NULL = never
+      audited; existing data untouched), stamp 3;
     - newer stamped version -> SchemaVersionError (refuse, never corrupt).
     """
     version = current_version(conn)
@@ -191,8 +207,10 @@ def migrate(conn: sqlite3.Connection) -> int:
             f"{SCHEMA_VERSION}; upgrade jevmory"
         )
     elif version < SCHEMA_VERSION:
-        # Forward migrations hook: none beyond v2 yet.
-        create_all(conn)
+        # v2 -> v3 (2026-09-21): facts.verified_at vintage marker.
+        if not _column_exists(conn, "facts", "verified_at"):
+            conn.execute("ALTER TABLE facts ADD COLUMN verified_at TEXT")
+        create_all(conn)  # idempotent backstop for any missing table/index
         _stamp(conn, SCHEMA_VERSION)
     conn.commit()
     return current_version(conn) or SCHEMA_VERSION

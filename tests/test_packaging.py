@@ -28,7 +28,7 @@ class TestPackaging(unittest.TestCase):
         )
         project = data["project"]
         self.assertEqual(project["name"], "jevmory")
-        self.assertEqual(project["version"], "0.1.0")
+        self.assertEqual(project["version"], "0.2.0")
         self.assertEqual(
             project["scripts"]["jevmory"], "jevmory.cli:main"
         )

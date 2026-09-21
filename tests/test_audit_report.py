@@ -15,6 +15,7 @@ from jevmory.audit.report import (
     render_terminal,
 )
 from jevmory.audit.rules import REVIEW, LineVerdict
+from jevmory.thresholds import AUDIT_DISPOSITION_GATE
 
 
 def keep(number, text="holds up fine", section=None):
@@ -31,7 +32,7 @@ def problem(number, disposition, confidence=0.8, text="a claim that aged",
     return LineVerdict(
         line=MemoryLine(number=number, raw=f"- {text}", text=text,
                         section=section),
-        disposition=disposition, decisive=confidence >= 0.6,
+        disposition=disposition, decisive=confidence >= AUDIT_DISPOSITION_GATE,
         confidence=confidence, supported=supported, contradicted=contradicted,
     )
 
@@ -101,7 +102,7 @@ class RenderTerminalTest(unittest.TestCase):
         verdicts = [
             keep(4, text="fine claim"),
             problem(7, "stale", text="we use Postgres in staging"),
-            problem(8, "wrong", confidence=0.7, text="the port is 8000"),
+            problem(8, "wrong", confidence=0.85, text="the port is 8000"),
         ]
         out = render_terminal(report(verdicts))
         lines = out.splitlines()
@@ -111,7 +112,7 @@ class RenderTerminalTest(unittest.TestCase):
         # supp 25:29, contra 31:37, claim 39:
         rows = lines[4:6]
         for row, (number, keyword, conf) in zip(
-            rows, [(7, "STALE", "0.80"), (8, "WRONG", "0.70")]
+            rows, [(7, "STALE", "0.80"), (8, "WRONG", "0.85")]
         ):
             self.assertEqual(row[:4].strip(), str(number))
             self.assertEqual(row[6:17].strip(), keyword)
@@ -187,7 +188,8 @@ class RenderJsonTest(unittest.TestCase):
         self.assertEqual(payload["evidence"], {"facts": 12, "statements": 40})
         self.assertEqual(
             payload["counts"],
-            {"KEEP": 1, "STALE": 1, "WRONG": 0, "UNSUPPORTED": 0, REVIEW: 1},
+            {"KEEP": 1, "STALE": 1, "WRONG": 0, "UNSUPPORTED": 0,
+             REVIEW: 1, "VERIFIED": 0},
         )
         self.assertEqual(
             [entry["id"] for entry in payload["lines"]],
@@ -207,6 +209,8 @@ class RenderJsonTest(unittest.TestCase):
                 "confidence": 0.8,
                 "supported": 0.4,
                 "contradicted": 0.5,
+                "anchored": False,
+                "anchor_fact_id": None,
             },
         )
         self.assertIn("your memory has", payload["summary"])

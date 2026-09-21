@@ -17,7 +17,7 @@ cannot be attributed and is logged globally.
 
 Offline-first (PLAN #4): the hook only appends to the local SQLite
 store. It never calls the network; grading happens later via
-`jevmory dream`.
+`jevmory distill`.
 """
 
 from __future__ import annotations

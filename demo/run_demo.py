@@ -66,7 +66,10 @@ TRANSCRIPT = DEMO_DIR / "transcript.jsonl"
 PLANTED: tuple[tuple[str, tuple[float, float, str, float]], ...] = (
     ("pytest", (0.07, 0.93, "wrong", 0.93)),
     ("bun", (0.34, 0.71, "stale", 0.82)),
-    ("retry", (0.06, 0.05, "unsupported", 0.74)),
+    # 0.85 keeps the planted unsupported line DECISIVE under the v0.2
+    # disposition gate (0.8, raised from 0.6) — the demo promises an
+    # unsupported verdict, not a review-band line.
+    ("retry", (0.06, 0.05, "unsupported", 0.85)),
 )
 _KEEP = (0.92, 0.04, "keep", 0.90)
 _PEAK = 0.7  # one option at the peak, the rest share — sums to 1.0

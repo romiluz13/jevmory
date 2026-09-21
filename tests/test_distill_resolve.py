@@ -1,5 +1,5 @@
 """Ask lifecycle tests (M5): resolve (human decision) and
-bump_and_expire_asks (dream-time expiry)."""
+bump_and_expire_asks (distill-time expiry)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import tempfile
 import unittest
 
-from jevmory.dream.resolve import (
+from jevmory.distill.resolve import (
     KEEP_NEW,
     KEEP_OLD,
     RESOLVE_CHOICES,
@@ -28,7 +28,7 @@ from jevmory.memory.facts import (
     start_run,
 )
 from jevmory.memory.schema import connect, migrate
-from jevmory.thresholds import ASK_EXPIRY_DREAMS
+from jevmory.thresholds import ASK_EXPIRY_DISTILLS
 
 NOW = "2026-09-19T02:00:00Z"
 
@@ -192,10 +192,10 @@ class AskLifecycleTest(unittest.TestCase):
 
     # --- bump_and_expire_asks ----------------------------------------------
 
-    def test_bump_counts_one_per_dream_pass(self):
+    def test_bump_counts_one_per_distill_pass(self):
         ask = self.make_ask()
-        run_id = start_run(self.conn, project="p", kind="dream", now=NOW)
-        for expected in range(1, ASK_EXPIRY_DREAMS):
+        run_id = start_run(self.conn, project="p", kind="distill", now=NOW)
+        for expected in range(1, ASK_EXPIRY_DISTILLS):
             expired = bump_and_expire_asks(
                 self.conn, run_id, project="p", now=NOW
             )
@@ -207,8 +207,8 @@ class AskLifecycleTest(unittest.TestCase):
 
     def test_expiry_at_limit_is_keep_old(self):
         ask = self.make_ask()
-        run_id = start_run(self.conn, project="p", kind="dream", now=NOW)
-        for _ in range(ASK_EXPIRY_DREAMS - 1):
+        run_id = start_run(self.conn, project="p", kind="distill", now=NOW)
+        for _ in range(ASK_EXPIRY_DISTILLS - 1):
             bump_and_expire_asks(self.conn, run_id, project="p", now=NOW)
         expired = bump_and_expire_asks(self.conn, run_id, project="p", now=NOW)
         self.assertEqual(expired, (ask.id,))
@@ -219,10 +219,10 @@ class AskLifecycleTest(unittest.TestCase):
             get_fact(self.conn, self.incumbent.id).status, STATUS_ACTIVE
         )
 
-    def test_expiry_receipt_under_the_dream_run(self):
+    def test_expiry_receipt_under_the_distill_run(self):
         ask = self.make_ask()
-        run_id = start_run(self.conn, project="p", kind="dream", now=NOW)
-        for _ in range(ASK_EXPIRY_DREAMS):
+        run_id = start_run(self.conn, project="p", kind="distill", now=NOW)
+        for _ in range(ASK_EXPIRY_DISTILLS):
             bump_and_expire_asks(self.conn, run_id, project="p", now=NOW)
         rows = self.judgments()
         self.assertEqual(len(rows), 1)
@@ -238,7 +238,7 @@ class AskLifecycleTest(unittest.TestCase):
     def test_non_ask_facts_are_untouched_by_the_pass(self):
         self.make_ask()
         bump_ask(self.conn, self.incumbent.id, now=NOW)  # no-op on active
-        run_id = start_run(self.conn, project="p", kind="dream", now=NOW)
+        run_id = start_run(self.conn, project="p", kind="distill", now=NOW)
         expired = bump_and_expire_asks(self.conn, run_id, project="p", now=NOW)
         self.assertEqual(expired, ())
         self.assertEqual(

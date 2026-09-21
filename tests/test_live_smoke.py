@@ -5,7 +5,7 @@ tests pin everything around that: the budget cap fails closed as a
 JevError (run row closed, events queued), the probe drives the exact
 request -> envelope -> strict-parse path against a scripted transport,
 the probe corpus is synthetic and bounded, main() refuses cleanly
-without a key, and the --dream stage checks the opt-in marker BEFORE
+without a key, and the --distill stage checks the opt-in marker BEFORE
 any request or store trace.
 """
 
@@ -161,8 +161,8 @@ class ProbeTest(unittest.TestCase):
         self.assertTrue(body["state"]["project_context"]["synthetic"])
 
 
-class DreamSmokeGatesTest(unittest.TestCase):
-    """--dream: marker gate BEFORE any request or store trace."""
+class DistillSmokeGatesTest(unittest.TestCase):
+    """--distill: marker gate BEFORE any request or store trace."""
 
     def setUp(self):
         self._old_home = os.environ.get("JEVMORY_HOME")
@@ -186,7 +186,7 @@ class DreamSmokeGatesTest(unittest.TestCase):
             raise AssertionError("network must not be touched pre-marker")
 
         with self.assertRaises(live_smoke.GradingNotEnabledError):
-            live_smoke.run_dream_smoke(
+            live_smoke.run_distill_smoke(
                 self.project, "k", cap=5, transport=trap
             )
         self.assertEqual(fired, [])  # no request attempted
@@ -229,9 +229,9 @@ class MainTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("--cap", err.getvalue())
 
-    def test_dream_stage_exposes_the_force_flag(self):
+    def test_distill_stage_exposes_the_force_flag(self):
         # T7: --force used to be unreachable from the CLI; it now parses
-        # and plumbs into run_dream_smoke (here: clean marker refusal —
+        # and plumbs into run_distill_smoke (here: clean marker refusal —
         # no request, no store; the gate fires first as always)
         with TemporaryDirectory() as tmp:
             old_home = os.environ.get("JEVMORY_HOME")
@@ -240,7 +240,7 @@ class MainTest(unittest.TestCase):
             err, out = io.StringIO(), io.StringIO()
             try:
                 with redirect_stderr(err), redirect_stdout(out):
-                    code = live_smoke.main(["--dream", "--force"])
+                    code = live_smoke.main(["--distill", "--force"])
             finally:
                 os.environ.pop("TYPESAFE_API_KEY", None)
                 if old_home is None:

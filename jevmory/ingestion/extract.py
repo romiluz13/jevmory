@@ -234,7 +234,7 @@ def extract_candidates(*transcripts: ParsedTranscript) -> list[Candidate]:
 def candidates_from_statements(
     statements: tuple[Statement, ...] | list[Statement],
 ) -> list[Candidate]:
-    """Dream-time variant: candidates from stored (already redacted) event rows.
+    """Distill-time variant: candidates from stored (already redacted) event rows.
 
     Accepts any Statement-shaped sequence; groups by session_id so
     context is built per session even across a multi-session event list.

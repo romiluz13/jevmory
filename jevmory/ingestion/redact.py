@@ -5,7 +5,7 @@ to captured context (context is built from already-redacted events;
 ``redact`` is idempotent, so double application is safe). Nothing
 unredacted can ever leave the machine (privacy statement: only redacted
 candidate quotes + minimal project context leave, and only during an
-opted-in dream/audit).
+opted-in distill/audit).
 
 Patterns (PLAN v2 decision 5), applied in order — most specific first:
 

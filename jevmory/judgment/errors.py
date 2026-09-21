@@ -2,7 +2,7 @@
 
 One base class so callers can catch anything Jev-related with a single
 ``except JevError``. Fail-fast errors (auth, validation, protocol) are
-distinct from retry-exhausted: the caller (dream engine, hooks) treats
+distinct from retry-exhausted: the caller (distill engine, hooks) treats
 ``JevRetryExhausted`` as "leave the candidates queued and report",
 never as a crash (API reference: a memory hook must never crash a
 session).

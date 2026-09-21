@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import unittest
 
-from jevmory.dream.batch import PairPlan, plan_phase_b
+from jevmory.distill.batch import PairPlan, plan_phase_b
 from jevmory.ingestion.extract import Candidate
 from jevmory.judgment.batch import BatchError
 from jevmory.thresholds import BATCH_TOKEN_BUDGET

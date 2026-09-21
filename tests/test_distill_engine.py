@@ -1,4 +1,4 @@
-"""Dream engine tests (M5): end-to-end runs against a real store with
+"""Distill engine tests (M5): end-to-end runs against a real store with
 FakeJev — gate, queue/cap, phases A/B, routing, ask lifecycle, errors."""
 
 from __future__ import annotations
@@ -8,9 +8,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jevmory.dream import GradingNotEnabledError, run_dream
-from jevmory.dream.resolve import KEEP_NEW
-from jevmory.dream.writer import render_jevmory
+from jevmory.distill import GradingNotEnabledError, run_distill
+from jevmory.distill.resolve import KEEP_NEW
+from jevmory.distill.writer import render_jevmory
 from jevmory.ingestion.eventlog import event_id, optin_path, store_path
 from jevmory.ingestion.extract import chunk_text
 from jevmory.judgment.errors import JevRetryExhausted
@@ -22,8 +22,8 @@ from jevmory.memory.facts import (
 )
 from jevmory.memory.schema import connect, migrate
 from jevmory.thresholds import (
-    ASK_EXPIRY_DREAMS,
-    MAX_CANDIDATES_PER_DREAM,
+    ASK_EXPIRY_DISTILLS,
+    MAX_CANDIDATES_PER_DISTILL,
     NEAR_MISS_LOW,
     PAIR_SIGNIFICANCE_GATE,
 )
@@ -76,7 +76,7 @@ def scripted_pair(prefix="p0_0", same=0.15, contra=0.9,
     }
 
 
-class DreamEngineTest(unittest.TestCase):
+class DistillEngineTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.home = Path(self._tmp.name)
@@ -104,8 +104,8 @@ class DreamEngineTest(unittest.TestCase):
         self.conn.commit()
         return event_id(text, session)
 
-    def dream(self, client, now=NOW, **kwargs):
-        return run_dream(
+    def distill(self, client, now=NOW, **kwargs):
+        return run_distill(
             self.conn, project="p", client=client,
             project_dir=str(self.proj), home=self.home, now=now, **kwargs
         )
@@ -137,7 +137,7 @@ class DreamEngineTest(unittest.TestCase):
         other.mkdir()
         self.add_event("we prefer uv over pip for this project")
         with self.assertRaises(GradingNotEnabledError) as raised:
-            run_dream(
+            run_distill(
                 self.conn, project="p", client=FakeJev(),
                 project_dir=str(other), home=self.home, now=NOW,
             )
@@ -149,7 +149,7 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_marker_enables_grading_for_that_project(self):
         self.add_event("we prefer uv over pip for this project")
-        report = self.dream(FakeJev())
+        report = self.distill(FakeJev())
         self.assertEqual(report.api_calls, 1)
         self.assertEqual(self.pending_count(), 0)
 
@@ -162,7 +162,7 @@ class DreamEngineTest(unittest.TestCase):
         self.add_event("ok")  # below MIN_CANDIDATE_CHARS: no candidates
         second = self.add_event(repeat, session="s2")  # cross-session repeat
 
-        report = self.dream(FakeJev())
+        report = self.distill(FakeJev())
         self.assertEqual(report.run_id, 1)
         self.assertEqual(report.api_calls, 1)
         self.assertEqual(report.usage_tokens, 360)
@@ -184,7 +184,7 @@ class DreamEngineTest(unittest.TestCase):
         self.assertEqual(get_fact(self.conn, 2).support_count, 1)
 
         kind, stats, error, finished = self.run_row()
-        self.assertEqual((kind, error, finished), ("dream", None, NOW))
+        self.assertEqual((kind, error, finished), ("distill", None, NOW))
         stats = json.loads(stats)
         self.assertEqual(stats["api_calls"], 1)
         self.assertEqual(stats["usage"], 360)
@@ -196,7 +196,7 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_events_without_candidates_are_graded_not_requeued(self):
         self.add_event("ok")  # no candidates, deterministic empty yield
-        report = self.dream(FakeJev())
+        report = self.distill(FakeJev())
         self.assertEqual(report.events_graded, 1)
         self.assertEqual(report.candidates_graded, 0)
         self.assertEqual(report.api_calls, 0)
@@ -205,13 +205,13 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_context_includes_already_graded_turns(self):
         # S4: a pending candidate's context is the real conversation —
-        # including turns an earlier dream already graded. Building
+        # including turns an earlier distill already graded. Building
         # context from the pending tail only starved new candidates of
         # the session's earlier decisions.
         self.add_event("we settled on postgres fifteen for the audit service")
-        self.dream(FakeJev())  # grades it into fact 1
+        self.distill(FakeJev())  # grades it into fact 1
         self.add_event("the retention window is ninety days, not thirty")
-        report = self.dream(
+        report = self.distill(
             FakeJev(mode="scripted", answers=scripted_phase_a(significance=1.0))
         )
         self.assertEqual(report.events_graded, 1)  # only the new event
@@ -229,7 +229,7 @@ class DreamEngineTest(unittest.TestCase):
         self.add_event(claim)                        # s1, first occurrence
         self.add_event(claim.upper(), session="s1")  # s1 again, new wording
         self.add_event(claim, session="s2")          # a second session
-        report = self.dream(FakeJev())
+        report = self.distill(FakeJev())
         fact = get_fact(self.conn, 1)
         self.assertEqual(fact.support_count, 3)      # three source events
         self.assertEqual(report.sessions_by_fact[fact.id], 2)  # two sessions
@@ -244,7 +244,7 @@ class DreamEngineTest(unittest.TestCase):
     def test_state_reaches_client_with_default_context(self):
         self.add_event("we prefer uv over pip for this project")
         client = FakeJev()
-        self.dream(client)
+        self.distill(client)
         state, questions = client.requests[0]
         self.assertEqual(state["project_context"], {"name": "p"})
         self.assertEqual(len(state["candidates"]), 1)
@@ -255,7 +255,7 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_candidate_receipts_verbatim_with_stable_keys(self):
         event = self.add_event("we prefer uv over pip for this project")
-        report = self.dream(FakeJev())
+        report = self.distill(FakeJev())
         rows = self.judgments(report.run_id)
         self.assertEqual(len(rows), 3)
         by_question = {}
@@ -299,7 +299,7 @@ class DreamEngineTest(unittest.TestCase):
         chunks = chunk_text(statement)
         self.assertEqual(len(chunks), 2)  # fixture shape: two chunks, one event
         event = self.add_event(statement)
-        report = self.dream(FakeJev())
+        report = self.distill(FakeJev())
         self.assertEqual(report.events_graded, 1)  # ONE event...
         self.assertEqual(report.candidates_graded, 2)  # ...TWO groups
         self.assertEqual(report.occurrences, 2)
@@ -332,7 +332,7 @@ class DreamEngineTest(unittest.TestCase):
                 f"user decision number {n} about tooling choices",
                 session=f"u{n}",
             )
-        first = self.dream(FakeJev(), max_candidates=2)
+        first = self.distill(FakeJev(), max_candidates=2)
         self.assertEqual(first.events_graded, 2)
         self.assertEqual(first.events_deferred, 5)
         self.assertEqual(first.candidates_graded, 2)
@@ -343,17 +343,17 @@ class DreamEngineTest(unittest.TestCase):
         # queue order: the two oldest events (assistant) grade first
         self.assertEqual(roles, ["assistant", "assistant"])
 
-        second = self.dream(FakeJev(), max_candidates=2)
+        second = self.distill(FakeJev(), max_candidates=2)
         self.assertEqual(second.events_graded, 2)
         self.assertEqual(second.events_deferred, 3)
-        third = self.dream(FakeJev(), max_candidates=2)
+        third = self.distill(FakeJev(), max_candidates=2)
         self.assertEqual(third.events_graded, 2)
         self.assertEqual(third.events_deferred, 1)
         self.assertEqual(self.pending_count(), 1)
 
     def test_zero_spend_writes_no_run_row(self):
         client = FakeJev()
-        report = self.dream(client)
+        report = self.distill(client)
         self.assertIsNone(report.run_id)
         self.assertEqual(report.api_calls, 0)
         self.assertEqual(client.call_count, 0)
@@ -364,7 +364,7 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_nonpositive_cap_is_rejected(self):
         with self.assertRaises(ValueError):
-            self.dream(FakeJev(), max_candidates=0)
+            self.distill(FakeJev(), max_candidates=0)
 
     # --- phase A verdicts ----------------------------------------------------
 
@@ -372,7 +372,7 @@ class DreamEngineTest(unittest.TestCase):
         self.add_event("assistant chatter about maybe trying something")
         self.add_event("another assistant narration of progress",
                        role="assistant")
-        report = self.dream(FakeJev(mode="adversarial"))
+        report = self.distill(FakeJev(mode="adversarial"))
         self.assertEqual(report.events_graded, 2)
         self.assertEqual(report.dropped_low_durable, 2)
         self.assertEqual(report.near_misses, 2)  # 0.5 is in the band
@@ -385,7 +385,7 @@ class DreamEngineTest(unittest.TestCase):
     def test_low_significance_drops_are_counted(self):
         scripted = scripted_phase_a(significance=0.0)  # trivial
         self.add_event("we slightly prefer tabs in this one file")
-        report = self.dream(FakeJev(mode="scripted", answers=scripted))
+        report = self.distill(FakeJev(mode="scripted", answers=scripted))
         self.assertEqual(report.dropped_low_significance, 1)
         self.assertEqual(report.facts_added, ())
         self.assertEqual(json.loads(self.run_row()[1])
@@ -396,7 +396,7 @@ class DreamEngineTest(unittest.TestCase):
         self.add_event(INCUMBENT)
         client = FakeJev(mode="scripted",
                          answers=scripted_phase_a(significance=1.0))
-        report = self.dream(client)
+        report = self.distill(client)
         self.assertEqual(report.facts_added, (1,))
         self.assertEqual(report.pair_skipped_low_significance, 1)
         self.assertEqual(client.call_count, 1)  # Phase A only
@@ -408,10 +408,10 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_normalized_repeat_bumps_support_without_jev_pairs(self):
         self.add_event(INCUMBENT)
-        self.dream(FakeJev(mode="scripted", answers=scripted_phase_a()))
+        self.distill(FakeJev(mode="scripted", answers=scripted_phase_a()))
         self.add_event(INCUMBENT.upper(), session="s9")  # same normalized
         client = FakeJev(mode="scripted", answers=scripted_phase_a())
-        report = self.dream(client)
+        report = self.distill(client)
         self.assertEqual(report.facts_added, ())
         self.assertEqual(report.duplicates, 1)
         fact = get_fact(self.conn, 1)
@@ -424,11 +424,11 @@ class DreamEngineTest(unittest.TestCase):
     # --- phase B actions (scripted) -------------------------------------------
 
     def seed_fact(self, claim, significance=2.0):
-        """Add one fact via a dream. The scripted pair answers mark the
+        """Add one fact via a distill. The scripted pair answers mark the
         new candidate unrelated to any earlier fact (action none), so
         seeding never trips dedupe/conflict logic."""
         self.add_event(claim)
-        return self.dream(FakeJev(
+        return self.distill(FakeJev(
             mode="scripted",
             answers={
                 **scripted_phase_a(significance=significance),
@@ -437,14 +437,14 @@ class DreamEngineTest(unittest.TestCase):
             },
         ))
 
-    def pair_dream(self, answers):
+    def pair_distill(self, answers):
         self.add_event(CHALLENGER)
-        return self.dream(FakeJev(mode="scripted", answers=answers))
+        return self.distill(FakeJev(mode="scripted", answers=answers))
 
     def test_jev_duplicate_bumps_support_no_new_fact(self):
         self.seed_fact(INCUMBENT)
         self.add_event(DUPLICATE_WORDING)
-        report = self.dream(FakeJev(
+        report = self.distill(FakeJev(
             mode="scripted",
             answers={**scripted_phase_a(),
                      **scripted_pair(same=0.95, contra=0.05)},
@@ -457,7 +457,7 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_unrelated_pair_adds_plainly(self):
         self.seed_fact(INCUMBENT)
-        report = self.pair_dream({
+        report = self.pair_distill({
             **scripted_phase_a(),
             **scripted_pair(same=0.05, contra=0.05, verdict="unclear",
                             confidence=0.5),
@@ -470,7 +470,7 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_decisive_override_supersedes_incumbent(self):
         self.seed_fact(INCUMBENT)
-        report = self.pair_dream({
+        report = self.pair_distill({
             **scripted_phase_a(),
             **scripted_pair(same=0.1, contra=0.9, verdict="new_overrides",
                             confidence=0.9),
@@ -490,14 +490,14 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_low_confidence_conflict_becomes_ask(self):
         self.seed_fact(INCUMBENT)
-        report = self.pair_dream({
+        report = self.pair_distill({
             **scripted_phase_a(),
             **scripted_pair(verdict="old_stands", confidence=0.3),
         })
         self.assertEqual(report.asks, (2,))
         challenger = get_fact(self.conn, 2)
         self.assertEqual(challenger.status, STATUS_ASK)
-        self.assertEqual(challenger.ask_seen_count, 0)  # not bumped by its own dream
+        self.assertEqual(challenger.ask_seen_count, 0)  # not bumped by its own distill
         self.assertEqual(get_fact(self.conn, 1).status, "active")
         links = self.conn.execute(
             "SELECT fact_id, related_id, relation FROM fact_links "
@@ -521,7 +521,7 @@ class DreamEngineTest(unittest.TestCase):
                             verdict="new_overrides", confidence=0.9),
             **scripted_pair("p0_1", same=0.9, contra=0.05),
         }
-        report = self.dream(FakeJev(mode="scripted", answers=answers))
+        report = self.distill(FakeJev(mode="scripted", answers=answers))
         self.assertEqual(report.duplicates, 1)
         self.assertEqual(report.superseded, ())
         self.assertEqual(report.facts_added, ())
@@ -545,7 +545,7 @@ class DreamEngineTest(unittest.TestCase):
             # vs fact 2: same claim -> duplicate wins the disposition
             **scripted_pair("p0_1", same=0.9, contra=0.05),
         }
-        report = self.dream(FakeJev(mode="scripted", answers=answers))
+        report = self.distill(FakeJev(mode="scripted", answers=answers))
         self.assertEqual(report.duplicates, 1)
         self.assertEqual(report.asks, ())  # duplicate won: no ask created
         self.assertEqual(get_fact(self.conn, 1).status, "active")
@@ -573,7 +573,7 @@ class DreamEngineTest(unittest.TestCase):
             **scripted_pair("p0_1", same=0.1, contra=0.85,
                             verdict="old_stands", confidence=0.3),
         }
-        report = self.dream(FakeJev(mode="scripted", answers=answers))
+        report = self.distill(FakeJev(mode="scripted", answers=answers))
         self.assertEqual(report.superseded, (1,))
         self.assertEqual(report.facts_added, (3,))
         links = sorted(self.conn.execute(
@@ -588,7 +588,7 @@ class DreamEngineTest(unittest.TestCase):
 
     def test_pair_receipts_recorded_per_fact(self):
         self.seed_fact(INCUMBENT)
-        report = self.pair_dream({
+        report = self.pair_distill({
             **scripted_phase_a(),
             **scripted_pair(verdict="old_stands", confidence=0.3),
         })
@@ -609,10 +609,10 @@ class DreamEngineTest(unittest.TestCase):
     # --- ask lifecycle end-to-end ---------------------------------------------
 
     def test_ask_resolves_keep_new_end_to_end(self):
-        from jevmory.dream import resolve
+        from jevmory.distill import resolve
 
         self.seed_fact(INCUMBENT)
-        self.pair_dream({
+        self.pair_distill({
             **scripted_phase_a(),
             **scripted_pair(verdict="old_stands", confidence=0.3),
         })
@@ -625,20 +625,20 @@ class DreamEngineTest(unittest.TestCase):
         ).fetchall()
         self.assertIn(("resolve",), runs)
 
-    def test_ask_expires_after_three_unresolved_dreams(self):
+    def test_ask_expires_after_three_unresolved_distills(self):
         self.seed_fact(INCUMBENT)
-        self.pair_dream({
+        self.pair_distill({
             **scripted_phase_a(),
             **scripted_pair(verdict="old_stands", confidence=0.3),
         })
-        # dreams with no events still run the expiry pass (ask is open)
-        for n in range(1, ASK_EXPIRY_DREAMS + 1):
-            report = self.dream(FakeJev(), now=LATER[18 + n])
+        # distills with no events still run the expiry pass (ask is open)
+        for n in range(1, ASK_EXPIRY_DISTILLS + 1):
+            report = self.distill(FakeJev(), now=LATER[18 + n])
             self.assertEqual(report.api_calls, 0)
             self.assertEqual(report.events_graded, 0)
             self.assertIsNotNone(report.run_id)  # a real run row each time
             challenger = get_fact(self.conn, 2)
-            if n < ASK_EXPIRY_DREAMS:
+            if n < ASK_EXPIRY_DISTILLS:
                 self.assertEqual(challenger.status, STATUS_ASK)
                 self.assertEqual(challenger.ask_seen_count, n)
                 self.assertEqual(report.asks_expired, ())
@@ -657,18 +657,18 @@ class DreamEngineTest(unittest.TestCase):
     def test_default_cap_is_fifty_groups(self):
         # 60 single-candidate events: the DEFAULT cap (no explicit
         # max_candidates) grades 50 groups and defers the rest — an
-        # uncapped default was a first-dream budget footgun (S5)
+        # uncapped default was a first-distill budget footgun (S5)
         for n in range(60):
             self.add_event(
                 f"decision number {n:02d} about distinct tooling topic",
                 session=f"s{n:02d}",
             )
-        report = self.dream(FakeJev())
+        report = self.distill(FakeJev())
         self.assertEqual(report.candidates_graded, 50)
         self.assertEqual(report.events_graded, 50)
         self.assertEqual(report.events_deferred, 10)
         self.assertEqual(self.pending_count(), 10)
-        self.assertEqual(MAX_CANDIDATES_PER_DREAM, 50)
+        self.assertEqual(MAX_CANDIDATES_PER_DISTILL, 50)
 
     # --- multi-batch phase A ----------------------------------------------------
 
@@ -687,7 +687,7 @@ class DreamEngineTest(unittest.TestCase):
                 session="s0",
             )
         client = FakeJev()
-        report = self.dream(client, max_candidates=None)
+        report = self.distill(client, max_candidates=None)
         self.assertGreater(client.call_count, 1)
         self.assertEqual(report.api_calls, client.call_count)
         self.assertEqual(report.candidates_graded, 120)
@@ -710,15 +710,15 @@ class DreamEngineTest(unittest.TestCase):
         self.add_event("one more durable user statement about linting")
         client = FakeJev(errors={"always": JevRetryExhausted("429 stuck")})
         with self.assertRaises(JevRetryExhausted):
-            self.dream(client)
+            self.distill(client)
         kind, stats, error, finished = self.run_row()
-        self.assertEqual(kind, "dream")
+        self.assertEqual(kind, "distill")
         self.assertEqual(error, "JevRetryExhausted")
         self.assertEqual(finished, NOW)
         self.assertIsNone(stats)
         self.assertEqual(self.pending_count(), 1)  # grading incomplete
-        # recovery: the same queue grades cleanly next dream
-        report = self.dream(FakeJev())
+        # recovery: the same queue grades cleanly next distill
+        report = self.distill(FakeJev())
         self.assertEqual(report.events_graded, 1)
         self.assertEqual(self.pending_count(), 0)
 
@@ -729,10 +729,10 @@ class DreamEngineTest(unittest.TestCase):
         self.add_event("one more durable user statement about linting")
         client = FakeJev(errors={"always": RuntimeError("interpreter blew up")})
         with self.assertRaises(RuntimeError):
-            self.dream(client)
+            self.distill(client)
         kind, stats, error, finished = self.run_row()
         self.assertEqual((kind, error, finished),
-                         ("dream", "RuntimeError", NOW))
+                         ("distill", "RuntimeError", NOW))
         self.assertIsNone(stats)
         self.assertEqual(self.pending_count(), 1)  # grading incomplete
 

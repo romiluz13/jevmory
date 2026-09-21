@@ -60,7 +60,7 @@ If that prints `OK`, you have a working development environment.
 - `docs/DOMAIN.md` — domain invariants (the non-negotiables)
 - `jevmory/` — the package: `ingestion/` (parsers, redaction, scan),
   `judgment/` (Jev client, FakeJev), `memory/` (SQLite store, facts,
-  receipts), `audit/` (memory-file grading, reports), `dream/`
+  receipts), `audit/` (memory-file grading, reports), `distill/`
   (grading engine, `jevmory.md` writer), plus `cli.py` and `hook.py`
 - `.ddd/notes/` — the running decision log
 - `demo/` — the offline planted-error demo; `scripts/live_smoke.py` —

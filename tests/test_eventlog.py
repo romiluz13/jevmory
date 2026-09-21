@@ -199,7 +199,7 @@ class EventLogTest(unittest.TestCase):
 
     def test_two_threads_ingest_concurrently(self):
         # WAL + busy_timeout=5000 must make concurrent appends just work
-        # (the "nightly dream" fan-out ingests many transcripts).
+        # (the "nightly distill" fan-out ingests many transcripts).
         errors: list[Exception] = []
 
         def worker(parsed):

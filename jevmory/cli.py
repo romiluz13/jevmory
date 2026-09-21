@@ -2,8 +2,10 @@
 
     jevmory init [--enable-grading] [--project DIR]
     jevmory ingest --transcript PATH | --scan [--project DIR] [--test]
-    jevmory dream   [--project DIR] [--offline] [--force]
+    jevmory distill   [--project DIR] [--offline] [--force]
+                      [--backend typesafe|kev]
     jevmory audit   [MEMORY.md] [--project DIR] [--json|--md] [--offline]
+                    [--backend typesafe|kev]
     jevmory resolve <fact_id> --keep-new|--keep-old [--project DIR]
     jevmory status  [--project DIR]
     jevmory install --agent claude|codex [--project DIR] [--yes]
@@ -11,9 +13,15 @@
 Privacy by architecture (PLAN #4) is enforced here, at the boundary:
 
 - ingest / scan / status / install / hooks are local-only, always;
-- grading — dream or audit with a LIVE client — requires both a
-  per-project opt-in marker (`init --enable-grading`) and
+- grading — distill or audit with a LIVE client — requires a
+  per-project opt-in marker (`init --enable-grading`). The default
+  backend (TypeSafe Jev, api.typesafe.ai) also requires
   ``$TYPESAFE_API_KEY``;
+- ``--backend kev`` points grading at a LOCAL wire-compatible server
+  (jaredpalmer/kev, ``$JEVMORY_KEV_ENDPOINT``, default
+  ``http://127.0.0.1:8009``) — no key, no external egress; the marker
+  is still required, and receipts are experimental (see
+  ``jevmory/judgment/client.py``);
 - ``--offline`` swaps in FakeJev (simulated, decisive) so the whole
   pipeline runs with zero network and no marker: the opt-in gate
   guards API egress, not local computation.
@@ -37,9 +45,9 @@ from typing import Any
 from jevmory import __version__
 from jevmory.audit.engine import run_audit
 from jevmory.audit.report import render_json, render_md, render_terminal
-from jevmory.dream.engine import GradingNotEnabledError, run_dream
-from jevmory.dream.resolve import KEEP_NEW, KEEP_OLD, resolve
-from jevmory.dream.writer import (
+from jevmory.distill.engine import GradingNotEnabledError, run_distill
+from jevmory.distill.resolve import KEEP_NEW, KEEP_OLD, resolve
+from jevmory.distill.writer import (
     SENTINEL_CORE,
     SentinelError,
     render_jevmory,
@@ -64,7 +72,12 @@ from jevmory.ingestion.eventlog import (
 from jevmory.ingestion.extract import candidates_from_statements
 from jevmory.ingestion.redact import redactions_in
 from jevmory.ingestion.scan import detect_source, discover_transcripts
-from jevmory.judgment.client import JevClient
+from jevmory.judgment.client import (
+    DEFAULT_ENDPOINT,
+    KEV_ENDPOINT,
+    KEV_MODEL,
+    JevClient,
+)
 from jevmory.judgment.errors import JevError
 from jevmory.judgment.fake import MODE_NORMAL, FakeJev
 from jevmory.memory.facts import ask_facts
@@ -85,9 +98,45 @@ HOOK_SESSION_KEYS = ("session_id", "session", "sessionId")
 _ENABLE_GRADING_HINT = (
     "grading is off for this project — events queue locally forever.\n"
     "  enable:  jevmory init --enable-grading\n"
-    "  stay local (no API ever):  jevmory dream --offline"
+    "  stay local (no API ever):  jevmory distill --offline"
 )
-_KEY_HINT = "$TYPESAFE_API_KEY is not set — grading needs it, or use --offline"
+_KEY_HINT = (
+    "$TYPESAFE_API_KEY is not set — grading needs it, or use --offline,\n"
+    "  or --backend kev (a local wire-compatible server, no key needed)"
+)
+
+_BACKENDS = ("typesafe", "kev")
+
+
+def _backend_choice(raw: str | None) -> str:
+    """Resolve the grading backend: --backend wins, else $JEVMORY_BACKEND."""
+    backend = raw or os.environ.get("JEVMORY_BACKEND", "typesafe")
+    if backend not in _BACKENDS:
+        raise ValueError(
+            f"unknown backend {backend!r} (use {' or '.join(_BACKENDS)}, "
+            "or set $JEVMORY_BACKEND)"
+        )
+    return backend
+
+
+def _live_client(backend: str = "typesafe"):
+    """The live grading client for a backend, or None when unavailable.
+
+    typesafe: JevClient from $TYPESAFE_API_KEY (None if unset).
+    kev: a local wire-compatible server (jaredpalmer/kev) — no key, no
+    external egress; the endpoint comes from $JEVMORY_KEV_ENDPOINT
+    (default http://127.0.0.1:8009). The opt-in marker is still
+    required: grading is grading, wherever the model runs.
+    """
+    if backend == "kev":
+        endpoint = os.environ.get("JEVMORY_KEV_ENDPOINT") or KEV_ENDPOINT
+        return JevClient(
+            "local", endpoint=endpoint, model=KEV_MODEL
+        ), endpoint
+    key = os.environ.get("TYPESAFE_API_KEY")
+    if not key:
+        return None, DEFAULT_ENDPOINT
+    return JevClient(key), DEFAULT_ENDPOINT
 
 
 def _fail(message: str) -> int:
@@ -106,13 +155,6 @@ def _open_store(project_dir: str):
     conn = connect(path)
     migrate(conn)
     return conn
-
-
-def _live_client():
-    """JevClient from $TYPESAFE_API_KEY, or None (caller fails cleanly)."""
-
-    key = os.environ.get("TYPESAFE_API_KEY")
-    return JevClient(key) if key else None
 
 
 def _offline_client() -> FakeJev:
@@ -152,7 +194,7 @@ def _cmd_init(args, stdin_text: str | None) -> int:
         marker.touch()
         print(f"marker:   {marker} (created)")
         print(
-            "you have opted in: `jevmory dream` and `jevmory audit` may send\n"
+            "you have opted in: `jevmory distill` and `jevmory audit` may send\n"
             "  redacted candidate text + surrounding context to the TypeSafe Jev\n"
             "  API (api.typesafe.ai) for grading. Remove the marker file any time\n"
             "  to stop all egress; queued events are kept."
@@ -248,7 +290,7 @@ def _ingest_scan(args) -> int:
         f"transcripts: {len(found)}   inserted: {total_inserted}   "
         f"duplicates: {total_ignored}"
     )
-    print("next: jevmory dream --offline   (local simulation, no API)")
+    print("next: jevmory distill --offline   (local simulation, no API)")
     return 0
 
 
@@ -313,10 +355,10 @@ def _read_stdin() -> str:
     return ""
 
 
-# --- dream ---------------------------------------------------------------------
+# --- distill ---------------------------------------------------------------------
 
 
-def _cmd_dream(args, stdin_text: str | None) -> int:
+def _cmd_distill(args, stdin_text: str | None) -> int:
     project = _project_dir(args.project)
     slug = project_slug(project)
     conn = _open_store(project)
@@ -325,11 +367,20 @@ def _cmd_dream(args, stdin_text: str | None) -> int:
         client = _offline_client()
         print("offline: simulated grading (FakeJev) — nothing leaves this machine")
     else:
-        client = _live_client()
+        try:
+            backend = _backend_choice(getattr(args, "backend", None))
+        except ValueError as exc:
+            return _fail(str(exc))
+        client, endpoint = _live_client(backend)
         if client is None:
             return _fail(_KEY_HINT)
+        if backend == "kev":
+            print(
+                f"backend: kev — local server {endpoint} "
+                "(no key; experimental receipts)"
+            )
     try:
-        report = run_dream(
+        report = run_distill(
             conn,
             project=slug,
             client=client,
@@ -399,9 +450,18 @@ def _cmd_audit(args, stdin_text: str | None) -> int:
     else:
         if not optin_path(project).exists():
             return _fail(_ENABLE_GRADING_HINT)
-        client = _live_client()
+        try:
+            backend = _backend_choice(getattr(args, "backend", None))
+        except ValueError as exc:
+            return _fail(str(exc))
+        client, endpoint = _live_client(backend)
         if client is None:
             return _fail(_KEY_HINT)
+        if backend == "kev":
+            print(
+                f"backend: kev — local server {endpoint} "
+                "(no key; experimental receipts)"
+            )
 
     conn = _open_store(project)
     try:
@@ -446,7 +506,7 @@ def _cmd_resolve(args, stdin_text: str | None) -> int:
     print(f"ask {args.fact_id}: {verb}")
     print(f"  claim:    {fact.claim}")
     print(f"  status:   {fact.status}")
-    print("next: jevmory dream   (jevmory.md regenerates with the resolution)")
+    print("next: jevmory distill   (jevmory.md regenerates with the resolution)")
     return 0
 
 
@@ -468,7 +528,7 @@ def _cmd_status(args, stdin_text: str | None) -> int:
         print("first step:   jevmory ingest --scan")
         if not marker.exists():
             print("grading:      " + _ENABLE_GRADING_HINT.splitlines()[0])
-            print("              jevmory init --enable-grading   jevmory dream --offline")
+            print("              jevmory init --enable-grading   jevmory distill --offline")
         return 0
 
     conn = _open_store(project)
@@ -506,18 +566,18 @@ def _cmd_status(args, stdin_text: str | None) -> int:
     for ask in ask_facts(conn, slug):
         print(f"open ask:     #{ask.id} {ask.claim}")
         if ask.ask_seen_count:
-            print(f"              seen in {ask.ask_seen_count} dream(s); expires keep-old at 3")
+            print(f"              seen in {ask.ask_seen_count} distill(s); expires keep-old at 3")
     if marker.exists():
         print("grading:      enabled (opt-in marker present)")
     else:
         print("grading:      off — events queue locally forever, by design")
-        print("              jevmory init --enable-grading   jevmory dream --offline")
+        print("              jevmory init --enable-grading   jevmory distill --offline")
 
     if artifact.exists():
         healthy = SENTINEL_CORE in artifact.read_text(encoding="utf-8")
         print(f"jevmory.md:     {artifact} ({'sentinel ok' if healthy else 'NO SENTINEL — not ours'})")
     else:
-        print(f"jevmory.md:     not written yet (jevmory dream)")
+        print(f"jevmory.md:     not written yet (jevmory distill)")
     _hook_status(project)
     print(
         "privacy:      ingest/scan/status/hooks are always local. Grading sends\n"
@@ -806,7 +866,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--project", metavar="DIR")
     p.set_defaults(func=_cmd_ingest)
 
-    p = sub.add_parser("dream", help="grade + consolidate; writes jevmory.md")
+    p = sub.add_parser("distill", help="grade + consolidate; writes jevmory.md")
     p.add_argument("--project", metavar="DIR")
     p.add_argument(
         "--offline",
@@ -814,9 +874,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="simulated grading (FakeJev): no API, no marker needed",
     )
     p.add_argument(
+        "--backend",
+        choices=_BACKENDS,
+        help="grading backend (default: $JEVMORY_BACKEND or typesafe; "
+        "kev = local server, no key)",
+    )
+    p.add_argument(
         "--force", action="store_true", help="overwrite a foreign jevmory.md"
     )
-    p.set_defaults(func=_cmd_dream)
+    p.set_defaults(func=_cmd_distill)
 
     p = sub.add_parser("audit", help="grade a memory file against the store")
     p.add_argument("memory_file", nargs="?", default="MEMORY.md")
@@ -828,6 +894,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         help="simulated grading (FakeJev): no API, no marker needed",
+    )
+    p.add_argument(
+        "--backend",
+        choices=_BACKENDS,
+        help="grading backend (default: $JEVMORY_BACKEND or typesafe; "
+        "kev = local server, no key)",
     )
     p.set_defaults(func=_cmd_audit)
 

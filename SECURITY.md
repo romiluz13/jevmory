@@ -16,7 +16,7 @@ unreachable, contact the maintainer via their GitHub profile
 
 - Session transcripts never leave your machine. Hooks ingest locally
   into a per-project SQLite store under `~/.jevmory/`.
-- Grading (`dream`, `audit` with a key set) sends redacted candidate
+- Grading (`distill`, `audit` with a key set) sends redacted candidate
   quotes (≤600 chars), verbatim context (≤800 chars), and the project
   name — nothing else — and only when the project opted in
   (`jevmory init --enable-grading`) and `$TYPESAFE_API_KEY` is set.

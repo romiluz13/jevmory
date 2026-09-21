@@ -18,9 +18,11 @@ Layout (PLAN "jevmory.md output format"):
   "seen
   in N sessions" (``sessions_by_fact``: distinct observing sessions —
   NOT ``support_count``, which counts events and overclaims whenever
-  one session observes a claim across several turns; review S6),
-  "last seen <Mon DD>", and a purely visual ``stale`` badge past
-  ``STALENESS_BADGE_DAYS`` (no decay, ever);
+  one session observes a claim across several turns; review S6), the
+  vintage marker (v3): "said <Mon DD>" plus "verified <Mon DD>" when
+  stage 1 of the audit confirmed it verbatim, or "unverified" when it
+  never has been — never a guessed date, never silence — and a purely
+  visual ``stale`` badge past ``STALENESS_BADGE_DAYS`` (no decay, ever);
 - open asks as "Questions for you" with the resolve command.
 
 ``write_jevmory`` is the sentinel guard: a path that exists without
@@ -50,7 +52,7 @@ CATEGORY_ORDER = tuple(
 
 SENTINEL = (
     f"<!-- jevmory v{__version__} sentinel — generated file, do not edit; "
-    "regenerate with `jevmory dream` -->"
+    "regenerate with `jevmory distill` -->"
 )
 # Version-independent core: recognizes files written by ANY jevmory version.
 SENTINEL_CORE = "generated file, do not edit"
@@ -154,8 +156,7 @@ def _fact_block(
     # noul-recovery formula was developer math in a user artifact.
     receipt = (
         f"`{fact.category} · {word}` — confidence **{fact.confidence:.2f}** "
-        f"· {_seen_phrase(fact, sessions)} · "
-        f"last seen {_last_seen(fact, now_dt)}"
+        f"· {_seen_phrase(fact, sessions)} · {_vintage_phrase(fact, now_dt)}"
     )
     return [f'- **"{_display(fact.claim)}"**', f"  {receipt}", ""]
 
@@ -194,12 +195,25 @@ def _seen_phrase(fact: Fact, sessions: int | None) -> str:
     return f"seen in {sessions} {noun}"
 
 
-def _last_seen(fact: Fact, now_dt: datetime | None) -> str:
-    stamp = fact.last_supported_at or fact.created_at
-    seen = _parse_ts(stamp)
-    text = f"{seen:%b} {seen.day}"
+def _vintage_phrase(fact: Fact, now_dt: datetime | None) -> str:
+    """Said-then vs verified-now (schema v3 vintage markers).
+
+    ``said`` is when the project last supported the claim
+    (``last_supported_at`` falling back to ``created_at``). The audit
+    trail reads honestly in both directions: a verified fact carries
+    its check date, an unaudited one says "unverified" out loud —
+    never a guessed date, never silence. The purely visual ``stale``
+    badge still rides the SAID date (no decay, ever).
+    """
+    seen = _parse_ts(fact.last_supported_at or fact.created_at)
+    text = f"said {seen:%b} {seen.day}"
     if now_dt is not None and (now_dt - seen).days > STALENESS_BADGE_DAYS:
         text += " · stale"  # purely visual (PLAN "No decay in v1")
+    if fact.verified_at:
+        verified = _parse_ts(fact.verified_at)
+        text += f" · verified {verified:%b} {verified.day}"
+    else:
+        text += " · unverified"
     return text
 
 

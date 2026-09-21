@@ -95,7 +95,7 @@ class DroidParserTest(unittest.TestCase):
         # Judgment rule (same as codex): no prefix may be broad enough
         # to catch normal speech. Ad hoc root-agent dispatches with
         # VARIED phrasing ("Read /Users/... Begin ...") are typed, not
-        # templated: kept, the dream grader downweights commands.
+        # templated: kept, the distill grader downweights commands.
         texts = {s.text for s in self.parsed.statements}
         self.assertIn("keep going", texts)
         self.assertIn(

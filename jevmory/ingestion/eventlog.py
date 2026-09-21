@@ -1,7 +1,7 @@
 """SQLite Event log: the events table (DDL owned by ``jevmory.memory.schema``).
 
 The events table is the immutable statement log and the offline queue:
-``graded_at`` stays NULL until a Dream run judges the event.
+``graded_at`` stays NULL until a Distill run judges the event.
 
 Event id (PLAN v2, review R2): ``sha256(normalized_content + session_id)``
 — never path/line based. Consequences, all deliberate:
@@ -113,7 +113,7 @@ def optin_path(
     Privacy by architecture (PLAN #4): hooks only ever ingest locally;
     grading — anything that calls the Jev API — requires this marker,
     created by ``jevmory init --enable-grading``. No marker -> the
-    dream engine refuses to grade and candidates stay queued.
+    distill engine refuses to grade and candidates stay queued.
     """
     base = Path(home) if home is not None else default_home()
     return base / ".jevmory" / "projects" / f"{project_slug(project_dir)}.optin"

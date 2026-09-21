@@ -27,7 +27,7 @@ from jevmory.cli import (
     _patch_codex_config,
     main,
 )
-from jevmory.dream.writer import SENTINEL_CORE
+from jevmory.distill.writer import SENTINEL_CORE
 from jevmory.ingestion.eventlog import project_slug, store_path
 from jevmory.memory.facts import add_fact, add_link, mark_ask
 from jevmory.memory.schema import connect, migrate
@@ -341,7 +341,7 @@ class CliTest(unittest.TestCase):
         self.assertIn("transcript: OK (claude)", out)
         self.assertIsNone(next(self.home.rglob(".jevmory"), None))
 
-    # --- dream -----------------------------------------------------------------
+    # --- distill -----------------------------------------------------------------
 
     def _ingested(self):
         self.run_cli(
@@ -349,10 +349,10 @@ class CliTest(unittest.TestCase):
              "--project", str(self.project)]
         )
 
-    def test_dream_offline_runs_the_whole_pipeline(self):
+    def test_distill_offline_runs_the_whole_pipeline(self):
         self._ingested()
         rc, out, err = self.run_cli(
-            ["dream", "--offline", "--project", str(self.project)]
+            ["distill", "--offline", "--project", str(self.project)]
         )
         self.assertEqual(rc, 0)
         self.assertIn("offline: simulated grading", out)
@@ -364,41 +364,41 @@ class CliTest(unittest.TestCase):
         self.assertTrue(artifact.exists())
         self.assertIn(SENTINEL_CORE, artifact.read_text(encoding="utf-8"))
 
-    def test_dream_offline_is_idempotent_and_reports_empty_queue(self):
+    def test_distill_offline_is_idempotent_and_reports_empty_queue(self):
         self._ingested()
-        self.run_cli(["dream", "--offline", "--project", str(self.project)])
+        self.run_cli(["distill", "--offline", "--project", str(self.project)])
         rc, out, err = self.run_cli(
-            ["dream", "--offline", "--project", str(self.project)]
+            ["distill", "--offline", "--project", str(self.project)]
         )
         self.assertEqual(rc, 0)
         self.assertIn("nothing to grade", out)
         self.assertEqual(self.facts_with_status("active"), [1])  # no duplicates
 
-    def test_dream_live_without_marker_fails_with_the_hint(self):
+    def test_distill_live_without_marker_fails_with_the_hint(self):
         # The privacy gate fires BEFORE anything is sent: no marker, no
         # egress, no matter that a key exists.
         os.environ["TYPESAFE_API_KEY"] = "test-key-not-a-real-secret"
         self._ingested()
-        rc, out, err = self.run_cli(["dream", "--project", str(self.project)])
+        rc, out, err = self.run_cli(["distill", "--project", str(self.project)])
         self.assertEqual(rc, 1)
         self.assertIn("grading is off for this project", err)
         self.assertIn("jevmory init --enable-grading", err)
         self.assertEqual(self.facts_with_status("active"), [])
 
-    def test_dream_live_with_marker_but_no_key_fails_with_the_hint(self):
+    def test_distill_live_with_marker_but_no_key_fails_with_the_hint(self):
         self.run_cli(["init", "--enable-grading", "--project", str(self.project)])
         self._ingested()
-        rc, out, err = self.run_cli(["dream", "--project", str(self.project)])
+        rc, out, err = self.run_cli(["distill", "--project", str(self.project)])
         self.assertEqual(rc, 1)
         self.assertIn("$TYPESAFE_API_KEY is not set", err)
         self.assertEqual(self.facts_with_status("active"), [])
 
-    def test_dream_refuses_a_foreign_jevmory_without_force(self):
+    def test_distill_refuses_a_foreign_jevmory_without_force(self):
         self._ingested()
         artifact = self.project / "jevmory.md"
         artifact.write_text("# my personal notes, not jevmory's\n", encoding="utf-8")
         rc, out, err = self.run_cli(
-            ["dream", "--offline", "--project", str(self.project)]
+            ["distill", "--offline", "--project", str(self.project)]
         )
         self.assertEqual(rc, 1)
         self.assertIn("sentinel", err)
@@ -406,7 +406,7 @@ class CliTest(unittest.TestCase):
         self.assertIn("# my personal notes", artifact.read_text(encoding="utf-8"))
         # --force is the explicit overwrite
         rc, out, err = self.run_cli(
-            ["dream", "--offline", "--force", "--project", str(self.project)]
+            ["distill", "--offline", "--force", "--project", str(self.project)]
         )
         self.assertEqual(rc, 0)
         self.assertIn(SENTINEL_CORE, artifact.read_text(encoding="utf-8"))
@@ -484,13 +484,13 @@ class CliTest(unittest.TestCase):
 
     def test_status_reports_store_runs_and_asks(self):
         self._ingested()
-        self.run_cli(["dream", "--offline", "--project", str(self.project)])
+        self.run_cli(["distill", "--offline", "--project", str(self.project)])
         ask_id = self._make_ask()
         rc, out, err = self.run_cli(["status", "--project", str(self.project)])
         self.assertEqual(rc, 0)
         self.assertIn("events:       1 total, 0 pending grading", out)
         self.assertIn("facts:", out)
-        self.assertIn("last run:     dream", out)
+        self.assertIn("last run:     distill", out)
         self.assertIn(f"open ask:     #{ask_id}", out)
         self.assertIn("jevmory.md:     ", out)
         self.assertIn("grading:      off", out)
@@ -550,7 +550,7 @@ class CliTest(unittest.TestCase):
 
     def test_audit_offline_prints_the_terminal_report(self):
         self._ingested()
-        self.run_cli(["dream", "--offline", "--project", str(self.project)])
+        self.run_cli(["distill", "--offline", "--project", str(self.project)])
         memory = self._memory_file()
         rc, out, err = self.run_cli(
             ["audit", str(memory), "--offline", "--project", str(self.project)]
@@ -561,7 +561,7 @@ class CliTest(unittest.TestCase):
 
     def test_audit_offline_json_is_machine_readable(self):
         self._ingested()
-        self.run_cli(["dream", "--offline", "--project", str(self.project)])
+        self.run_cli(["distill", "--offline", "--project", str(self.project)])
         memory = self._memory_file()
         rc, out, err = self.run_cli(
             ["audit", str(memory), "--offline", "--json",
@@ -577,7 +577,7 @@ class CliTest(unittest.TestCase):
 
     def test_audit_offline_md_renders_a_table(self):
         self._ingested()
-        self.run_cli(["dream", "--offline", "--project", str(self.project)])
+        self.run_cli(["distill", "--offline", "--project", str(self.project)])
         memory = self._memory_file()
         rc, out, err = self.run_cli(
             ["audit", str(memory), "--offline", "--md",
@@ -604,6 +604,60 @@ class CliTest(unittest.TestCase):
         )
         self.assertEqual(rc, 1)
         self.assertIn("grading is off for this project", err)
+
+    # --- kev backend (v0.2): local wire-compatible grading, no key ------
+
+    def test_kev_backend_still_requires_the_marker(self):
+        # grading is grading wherever the model runs — the opt-in gate
+        # is not a key check, it's a project-owner check
+        memory = self._memory_file()
+        rc, out, err = self.run_cli(
+            ["audit", str(memory), "--backend", "kev",
+             "--project", str(self.project)]
+        )
+        self.assertEqual(rc, 1)
+        self.assertIn("grading is off for this project", err)
+
+    def test_kev_backend_needs_no_typesafe_key(self):
+        # with the marker present, kev builds a client with NO
+        # $TYPESAFE_API_KEY set — the key hint never fires; an empty
+        # store means zero questions, so nothing hits the wire either
+        self.run_cli(["init", "--enable-grading", "--project", str(self.project)])
+        rc, out, err = self.run_cli(
+            ["distill", "--backend", "kev", "--project", str(self.project)]
+        )
+        self.assertEqual(rc, 0)
+        self.assertNotIn("$TYPESAFE_API_KEY is not set", err)
+        self.assertIn("backend: kev", out)
+        self.assertIn("nothing to grade", out)
+
+    def test_kev_backend_honors_the_endpoint_env_var(self):
+        # $JEVMORY_KEV_ENDPOINT redirects the client; a port nothing
+        # listens on fails fast as a transport error, never a crash
+        os.environ["JEVMORY_KEV_ENDPOINT"] = "http://127.0.0.1:1/v1/systemone"
+        self.addCleanup(os.environ.pop, "JEVMORY_KEV_ENDPOINT", None)
+        self.run_cli(["init", "--enable-grading", "--project", str(self.project)])
+        memory = self._memory_file()
+        rc, out, err = self.run_cli(
+            ["audit", str(memory), "--backend", "kev",
+             "--project", str(self.project)]
+        )
+        self.assertEqual(rc, 1)
+        self.assertIn("backend: kev", out)
+        self.assertIn("audit failed", err)
+
+    def test_unknown_backend_from_env_fails_cleanly(self):
+        # marker present (the opt-in gate fires first, by design); the
+        # bogus $JEVMORY_BACKEND then fails cleanly, never a crash
+        os.environ["JEVMORY_BACKEND"] = "bogus"
+        self.addCleanup(os.environ.pop, "JEVMORY_BACKEND", None)
+        self.run_cli(["init", "--enable-grading", "--project", str(self.project)])
+        memory = self._memory_file()
+        rc, out, err = self.run_cli(
+            ["audit", str(memory), "--project", str(self.project)]
+        )
+        self.assertEqual(rc, 1)
+        self.assertIn("unknown backend", err)
 
     # --- install (print-only; patches are function-tested against tmp files) ---
 

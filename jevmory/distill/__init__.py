@@ -1,6 +1,6 @@
-"""Dream engine package (PLAN v2 M5): phases A/B composed into runs.
+"""Distill engine package (PLAN v2 M5): phases A/B composed into runs.
 
-- ``run_dream`` — one dream over the pending queue (privacy-gated,
+- ``run_distill`` — one distill over the pending queue (privacy-gated,
   capped, receipted), returning the report the CLI renders;
 - ``render_jevmory`` / ``write_jevmory`` — the sentinel-guarded
   artifact agents read;
@@ -9,16 +9,16 @@
 - ``plan_phase_b`` / rules — the pieces, individually testable.
 """
 
-from jevmory.dream.batch import PairPlan, PhaseBBatch, plan_phase_b
-from jevmory.dream.engine import DreamReport, GradingNotEnabledError, run_dream
-from jevmory.dream.resolve import (
+from jevmory.distill.batch import PairPlan, PhaseBBatch, plan_phase_b
+from jevmory.distill.engine import DistillReport, GradingNotEnabledError, run_distill
+from jevmory.distill.resolve import (
     KEEP_NEW,
     KEEP_OLD,
     RESOLVE_CHOICES,
     bump_and_expire_asks,
     resolve,
 )
-from jevmory.dream.rules import (
+from jevmory.distill.rules import (
     ACTION_ASK,
     ACTION_DUPLICATE,
     ACTION_NONE,
@@ -28,7 +28,7 @@ from jevmory.dream.rules import (
     pair_action,
     phase_a_verdict,
 )
-from jevmory.dream.writer import (
+from jevmory.distill.writer import (
     CATEGORY_ORDER,
     SENTINEL,
     AskPair,
@@ -45,7 +45,7 @@ __all__ = [
     "AskPair",
     "CATEGORY_ORDER",
     "CandidateVerdict",
-    "DreamReport",
+    "DistillReport",
     "GradingNotEnabledError",
     "KEEP_NEW",
     "KEEP_OLD",
@@ -61,6 +61,6 @@ __all__ = [
     "plan_phase_b",
     "render_jevmory",
     "resolve",
-    "run_dream",
+    "run_distill",
     "write_jevmory",
 ]

@@ -54,7 +54,7 @@ Built from REAL files observed on 2026-09-20 under
   workstreams/REVIEW-W2-CACHE.md. Begin your independent behavioral
   review now.`` (61), ``Continue as ... team lead from ... HANDOFF.md``
   (13), ``FREEZE CHECK ...``, ``Astra disposition ...`` — they are
-  typed, not templated, and the dream grader downweights commands;
+  typed, not templated, and the distill grader downweights commands;
   ``keep going`` (36), ``go ahed`` (11), ``yes`` (7) obviously stay.
   Verification pass over the full tree: 0 crashes, 0 malformed lines,
   36,077 statements kept (3,021 user, 33,056 assistant).

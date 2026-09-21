@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from jevmory import __version__
-from jevmory.dream.writer import (
+from jevmory.distill.writer import (
     CATEGORY_ORDER,
     SENTINEL,
     SENTINEL_CORE,
@@ -33,6 +33,7 @@ def make_fact(
     created_at="2026-09-01T00:00:00Z",
     updated_at="2026-09-01T00:00:00Z",
     last_supported_at="2026-09-01T00:00:00Z",
+    verified_at=None,
     **overrides,
 ):
     fields = dict(
@@ -40,13 +41,13 @@ def make_fact(
         significance=significance, confidence=confidence, status=status,
         source_event_ids=("ev1",), support_count=support_count,
         ask_seen_count=0, created_at=created_at, updated_at=updated_at,
-        last_supported_at=last_supported_at,
+        last_supported_at=last_supported_at, verified_at=verified_at,
     )
     fields.update(overrides)
     return Fact(**fields)
 
 
-class RenderDreamMdTest(unittest.TestCase):
+class RenderDistillMdTest(unittest.TestCase):
     def test_sentinel_first_and_versioned(self):
         md = render_jevmory([], now=NOW)
         self.assertTrue(md.startswith(SENTINEL + "\n"))
@@ -112,7 +113,7 @@ class RenderDreamMdTest(unittest.TestCase):
         self.assertNotIn("2·|", md)
         self.assertNotIn("0.900", md)
         self.assertIn("seen in 3 sessions", md)
-        self.assertIn("last seen Sep 1", md)
+        self.assertIn("said Sep 1 · unverified", md)
         self.assertNotIn("stale", md)  # 18 days: no badge
         # without the session counts (pure caller, no store): the receipt
         # counts occurrences and says so — it never dresses an event
@@ -120,6 +121,22 @@ class RenderDreamMdTest(unittest.TestCase):
         fallback = render_jevmory([fact], now=NOW)
         self.assertIn("seen 3 times", fallback)
         self.assertNotIn("sessions", fallback)
+
+    def test_vintage_markers_said_then_verified_now(self):
+        # v3: the audit trail renders honestly in both directions — a
+        # verified fact carries its check date; an unaudited one says
+        # "unverified" out loud, never a guessed date, never silence
+        verified = make_fact(
+            verified_at="2026-09-17T00:00:00Z",
+        )
+        md = render_jevmory([verified], now=NOW)
+        self.assertIn("said Sep 1 · verified Sep 17", md)
+        self.assertNotIn("unverified", md)
+
+    def test_vintage_phrase_falls_back_to_created_at(self):
+        fact = make_fact(last_supported_at=None)
+        md = render_jevmory([fact], now=NOW)
+        self.assertIn("said Sep 1 · unverified", md)
 
     def test_single_session_wording(self):
         md = render_jevmory(
@@ -134,7 +151,7 @@ class RenderDreamMdTest(unittest.TestCase):
     def test_stale_badge_is_visual_only(self):
         fact = make_fact(last_supported_at="2026-05-01T00:00:00Z")
         md = render_jevmory([fact], now=NOW)
-        self.assertIn("last seen May 1 · stale", md)
+        self.assertIn("said May 1 · stale · unverified", md)
         # same fact, recent now: identical confidence (no decay, ever)
         fresh = render_jevmory(
             [make_fact(last_supported_at="2026-09-18T00:00:00Z")], now=NOW
@@ -194,7 +211,7 @@ class RenderDreamMdTest(unittest.TestCase):
         self.assertEqual(first, second)
 
 
-class WriteDreamMdTest(unittest.TestCase):
+class WriteDistillMdTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.path = Path(self._tmp.name) / "jevmory.md"
@@ -221,7 +238,7 @@ class WriteDreamMdTest(unittest.TestCase):
 
     def test_older_version_sentinel_still_regenerates(self):
         old = "<!-- jevmory v0.0.1 sentinel — generated file, do not edit; " \
-              "regenerate with `jevmory dream` -->\nold contents\n"
+              "regenerate with `jevmory distill` -->\nold contents\n"
         self.path.write_text(old)
         write_jevmory(self.path, render_jevmory([], now=NOW))
         self.assertIn(f"v{__version__}", self.path.read_text())

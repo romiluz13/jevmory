@@ -50,6 +50,17 @@ from jevmory.thresholds import (
 DEFAULT_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 DEFAULT_MODEL = "jev-latest"
 
+# kev backend (v0.2 escape hatch): a wire-compatible, Apache-2.0 local
+# Jev server (github.com/jaredpalmer/kev, Qwen3 models) — ``python -m
+# kev.serve --run jaredpalmer/kev-4b --port 8009``. No auth; the key is
+# a placeholder the server ignores. For closed-network evaluation of
+# the grading pipeline, NOT a production stance: out-of-domain grading
+# (a general model judging durability) runs hotter than the tuned Jev,
+# so treat kev receipts as experimental and re-run audits against the
+# real API before trusting a jevmory.md built on it.
+KEV_ENDPOINT = "http://127.0.0.1:8009/v1/systemone"
+KEV_MODEL = "kev-latest"
+
 # (url, headers, body, timeout) -> response bytes; may raise
 # urllib.error.HTTPError / URLError exactly like the real transport.
 Transport = Callable[[str, dict[str, str], bytes, float], bytes]

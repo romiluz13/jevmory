@@ -1,4 +1,4 @@
-"""Verdict rules for the dream engine (PLAN "Decision rules", M5).
+"""Verdict rules for the distill engine (PLAN "Decision rules", M5).
 
 Code, not Jev, decides — Jev only answers. Every rule reads verbatim
 typed answers and applies a named threshold from ``thresholds.py``;

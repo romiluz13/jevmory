@@ -32,6 +32,27 @@ CREATE TABLE IF NOT EXISTS events (
 )
 """
 
+# The v2 facts DDL: everything v3 has MINUS the verified_at vintage
+# marker — a faithful v2-era store for the forward-migration test.
+V2_FACTS_DDL = """
+CREATE TABLE IF NOT EXISTS facts (
+  id INTEGER PRIMARY KEY,
+  project TEXT NOT NULL,
+  claim TEXT NOT NULL,
+  context TEXT,
+  category TEXT NOT NULL,
+  significance REAL NOT NULL,
+  confidence REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  source_event_ids TEXT NOT NULL,
+  support_count INTEGER NOT NULL DEFAULT 1,
+  ask_seen_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_supported_at TEXT
+)
+"""
+
 REQUIRED_TABLES = {
     "schema_version",
     "events",
@@ -164,6 +185,63 @@ class LegacyV1StoreTest(unittest.TestCase):
         )
         rows = conn.execute("SELECT COUNT(*) FROM events WHERE text IS NULL").fetchone()[0]
         self.assertEqual(rows, 1)
+
+
+class LegacyV2StoreTest(unittest.TestCase):
+    """v2 -> v3 (2026-09-21): facts.verified_at vintage marker added."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.db = Path(self._tmp.name) / "v2.db"
+
+    def _make_v2_store(self):
+        conn = sqlite3.connect(self.db)
+        conn.execute(
+            "CREATE TABLE schema_version (version INTEGER NOT NULL)"
+        )
+        conn.execute(V2_FACTS_DDL)
+        conn.execute(
+            "INSERT INTO facts (project, claim, category, significance, "
+            "confidence, source_event_ids, created_at, updated_at) "
+            "VALUES ('p', 'always use uv run in this repo', 'tooling', "
+            "2, 0.9, '[]', 'now', 'now')"
+        )
+        conn.execute("INSERT INTO schema_version (version) VALUES (2)")
+        conn.commit()
+        conn.close()
+
+    def test_v2_store_migrates_adding_verified_at(self):
+        self._make_v2_store()
+        conn = connect(self.db)
+        self.addCleanup(conn.close)
+        self.assertEqual(current_version(conn), 2)
+        version = migrate(conn)
+        self.assertEqual(version, SCHEMA_VERSION)
+        self.assertEqual(current_version(conn), SCHEMA_VERSION)
+        # the column exists, and pre-v3 data is untouched: NULL verified_at
+        # means "never audited" — never a guessed date, never corruption
+        columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(facts)")
+        }
+        self.assertIn("verified_at", columns)
+        claim, verified = conn.execute(
+            "SELECT claim, verified_at FROM facts WHERE id = 1"
+        ).fetchone()
+        self.assertEqual(claim, "always use uv run in this repo")
+        self.assertIsNone(verified)
+
+    def test_v2_migration_is_idempotent_after_partial_alter(self):
+        # a store that already gained the column (crash between ALTER
+        # and stamp) must migrate cleanly — _column_exists guards the
+        # duplicate ALTER
+        self._make_v2_store()
+        conn = connect(self.db)
+        self.addCleanup(conn.close)
+        conn.execute("ALTER TABLE facts ADD COLUMN verified_at TEXT")
+        conn.commit()
+        version = migrate(conn)
+        self.assertEqual(version, SCHEMA_VERSION)
 
 
 class FutureStoreTest(unittest.TestCase):

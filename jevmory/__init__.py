@@ -5,4 +5,4 @@ Python 3 stdlib only — no third-party runtime dependencies (mission
 invariant, enforced by tests/test_packaging.py).
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

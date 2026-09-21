@@ -1,11 +1,11 @@
-"""Dream verdict rule tests (M5): Phase A gates by role, Phase B pair
+"""Distill verdict rule tests (M5): Phase A gates by role, Phase B pair
 actions, near-miss band, stable receipt keys."""
 
 from __future__ import annotations
 
 import unittest
 
-from jevmory.dream.rules import (
+from jevmory.distill.rules import (
     ACTION_ASK,
     ACTION_DUPLICATE,
     ACTION_NONE,

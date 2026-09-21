@@ -1,4 +1,4 @@
-"""Ask lifecycle: human resolution and dream-time expiry (PLAN M5).
+"""Ask lifecycle: human resolution and distill-time expiry (PLAN M5).
 
 An ask is a conflict the Jev verdict could not decide: both rows are
 kept, the challenger is held in the ``ask`` status (out of active
@@ -9,9 +9,9 @@ it conflicted with (review S2 keeps all over-gate edges).
   writes a resolution receipt under a ``resolve`` run and applies it —
   against ALL of the ask's contradicts partners (review S7): one
   decision settles the whole conflict set, not just the oldest edge.
-- ``bump_and_expire_asks`` (dream): every dream that begins with an
+- ``bump_and_expire_asks`` (distill): every distill that begins with an
   ask unresolved increments ``ask_seen_count``; at
-  ``ASK_EXPIRY_DREAMS`` the ask expires — disposition ``keep-old``:
+  ``ASK_EXPIRY_DISTILLS`` the ask expires — disposition ``keep-old``:
   the incumbents stay active (they never left), the challenger
   retires. Absent a human decision the remembered facts win, mirroring
   the no-decay stance (absence of resolution is not evidence against
@@ -40,7 +40,7 @@ from jevmory.memory.facts import (
     start_run,
     supersede,
 )
-from jevmory.thresholds import ASK_EXPIRY_DREAMS
+from jevmory.thresholds import ASK_EXPIRY_DISTILLS
 
 # CLI flag vocabulary (kebab-case at the CLI: --keep-new / --keep-old).
 KEEP_NEW = "keep_new"
@@ -131,18 +131,18 @@ def bump_and_expire_asks(
     project: str,
     now: str | None = None,
 ) -> tuple[int, ...]:
-    """One dream pass over the project's asks: bump counts, expire at limit.
+    """One distill pass over the project's asks: bump counts, expire at limit.
 
-    Runs at the START of a dream, before grading — so an ask created by
-    this very dream is not counted for it (its first bump is the next
-    dream that begins with it still open). Returns the expired fact ids
+    Runs at the START of a distill, before grading — so an ask created by
+    this very distill is not counted for it (its first bump is the next
+    distill that begins with it still open). Returns the expired fact ids
     in id order; every expiry writes its keep-old receipt under
     ``run_id``.
     """
     expired: list[int] = []
     for fact in ask_facts(conn, project):
         count = bump_ask(conn, fact.id, now=now)
-        if count >= ASK_EXPIRY_DREAMS:
+        if count >= ASK_EXPIRY_DISTILLS:
             retire(conn, fact.id, now=now)
             record_judgment(
                 conn,

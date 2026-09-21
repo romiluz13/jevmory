@@ -13,16 +13,29 @@ from jevmory.audit.rules import (
     Q_DISPOSITION,
     Q_SUPPORTED,
     REVIEW,
+    VERIFIED,
     LineVerdict,
+    anchored_verdict,
     count_dispositions,
     line_verdict,
 )
 from jevmory.judgment.answers import ChoiceAnswer, NoulAnswer
+from jevmory.memory.facts import Fact
 from jevmory.thresholds import AUDIT_DISPOSITION_GATE
 
 
 def line(number=4):
     return MemoryLine(number=number, raw="- claim", text="claim", section=None)
+
+
+def _fact(fact_id=9, claim="claim"):
+    return Fact(
+        id=fact_id, project="p", claim=claim, context=None,
+        category="convention", significance=1.2, confidence=0.8,
+        status="active", source_event_ids=("ev1",), support_count=1,
+        ask_seen_count=0, created_at="2026-09-01T00:00:00Z",
+        updated_at="2026-09-01T00:00:00Z", last_supported_at=None,
+    )
 
 
 def answers(disposition="keep", confidence=0.8, supported=0.9,
@@ -112,7 +125,8 @@ class CountDispositionsTest(unittest.TestCase):
         counts = count_dispositions([])
         self.assertEqual(
             counts,
-            {"KEEP": 0, "STALE": 0, "WRONG": 0, "UNSUPPORTED": 0, REVIEW: 0},
+            {"KEEP": 0, "STALE": 0, "WRONG": 0, "UNSUPPORTED": 0,
+             REVIEW: 0, VERIFIED: 0},
         )
 
     def test_mixed_verdicts_counted_by_keyword(self):
@@ -121,12 +135,32 @@ class CountDispositionsTest(unittest.TestCase):
             line_verdict(line(2), answers()),
             line_verdict(line(3), answers(disposition="stale")),
             line_verdict(line(4), answers(confidence=0.4)),
+            anchored_verdict(line(5), _fact()),
         ]
         counts = count_dispositions(verdicts)
         self.assertEqual(counts["KEEP"], 2)
         self.assertEqual(counts["STALE"], 1)
         self.assertEqual(counts[REVIEW], 1)
+        self.assertEqual(counts["VERIFIED"], 1)
         self.assertEqual(counts["WRONG"], 0)
+
+
+class AnchoredVerdictTest(unittest.TestCase):
+    """Stage-1 verdicts: deterministic receipts, outside the gate."""
+
+    def test_anchored_verdict_reads_as_verified(self):
+        verdict = anchored_verdict(line(4), _fact(9))
+        self.assertTrue(verdict.anchored)
+        self.assertEqual(verdict.keyword, VERIFIED)
+        self.assertEqual(verdict.anchor_fact_id, 9)
+        self.assertEqual(verdict.disposition, "keep")
+
+    def test_confidence_is_a_receipt_not_calibration(self):
+        verdict = anchored_verdict(line(4), _fact(9))
+        self.assertEqual(verdict.confidence, 1.0)
+        self.assertEqual(verdict.supported, 1.0)
+        self.assertEqual(verdict.contradicted, 0.0)
+        self.assertTrue(verdict.decisive)  # by construction, never gated
 
 
 if __name__ == "__main__":

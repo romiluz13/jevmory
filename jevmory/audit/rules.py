@@ -13,6 +13,11 @@ The two Noul answers (supported / contradicted) are RECEIPTS, not
 gates: they are reported verbatim next to the disposition so a human
 can check the reasoning behind every keyword. Choice confidence is
 never blended into anything (DOMAIN "Confidence").
+
+Stage 1 (v0.2, ``audit/anchor.py``) runs before any of this: a line
+that matches a stored fact verbatim gets an ``anchored_verdict``
+(VERIFIED) without a model call — its "confidence" is a deterministic
+receipt, outside this module's gate entirely.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from typing import Mapping, Sequence
 from jevmory.audit.memfile import MemoryLine
 from jevmory.audit.questions import DISPOSITION_OPTIONS
 from jevmory.judgment.answers import ChoiceAnswer, NoulAnswer
+from jevmory.memory.facts import Fact
 from jevmory.thresholds import AUDIT_DISPOSITION_GATE
 
 # Report keyword per disposition (terminal report verdict column).
@@ -33,6 +39,9 @@ DISPOSITION_KEYWORDS = {
     "unsupported": "UNSUPPORTED",
 }
 REVIEW = "REVIEW"
+# Stage-1 anchor verdict (v0.2): the line matches a stored fact's claim
+# verbatim (normalized) — a string-equality receipt, not a model judgment.
+VERIFIED = "VERIFIED"
 
 # Stable receipt question keys (judgments.question_id for subject_kind
 # 'line' — see audit/questions.py docstring for why not l{i}_ ids).
@@ -51,13 +60,38 @@ class LineVerdict:
     confidence: float  # the disposition choice answer's confidence
     supported: float  # verbatim Noul receipt
     contradicted: float  # verbatim Noul receipt
+    anchored: bool = False  # stage 1: verbatim match on a stored fact
+    anchor_fact_id: int | None = None  # the matched fact (write-back target)
 
     @property
     def keyword(self) -> str:
         """The verdict keyword for the terminal report."""
+        if self.anchored:
+            return VERIFIED
         if not self.decisive:
             return REVIEW
         return DISPOSITION_KEYWORDS[self.disposition]
+
+
+def anchored_verdict(line: MemoryLine, fact: Fact) -> LineVerdict:
+    """Stage-1 verdict: the line IS the stored fact, verbatim.
+
+    Confidence 1.0 is the string-equality receipt — deterministic, not
+    model calibration — so it is never blended, never gated, and never
+    compared against ``AUDIT_DISPOSITION_GATE`` (stage 2's bar for
+    model answers). The receipts read as: fully supported, zero
+    contradiction, because the claim came from the fact itself.
+    """
+    return LineVerdict(
+        line=line,
+        disposition="keep",
+        decisive=True,
+        confidence=1.0,
+        supported=1.0,
+        contradicted=0.0,
+        anchored=True,
+        anchor_fact_id=fact.id,
+    )
 
 
 def line_verdict(
@@ -100,9 +134,10 @@ def line_verdict(
 
 
 def count_dispositions(verdicts: Sequence[LineVerdict]) -> dict[str, int]:
-    """Counts per verdict keyword (keep/stale/wrong/unsupported/review)."""
+    """Counts per verdict keyword (keep/stale/wrong/unsupported/review/verified)."""
     counts = {
-        keyword: 0 for keyword in (*DISPOSITION_KEYWORDS.values(), REVIEW)
+        keyword: 0
+        for keyword in (*DISPOSITION_KEYWORDS.values(), REVIEW, VERIFIED)
     }
     for verdict in verdicts:
         counts[verdict.keyword] += 1

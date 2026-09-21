@@ -41,7 +41,7 @@ PAIR_SIGNIFICANCE_GATE = 2
 SAME_CLAIM_GATE = 0.8  # >= -> duplicate: bump support_count, add source event id
 CONTRADICTION_GATE = 0.6  # >= -> conflict pair goes to Phase B questions
 SUPERSEDE_CONFIDENCE = 0.8  # destructive verdicts need high confidence (DOMAIN #3)
-ASK_EXPIRY_DREAMS = 3  # asks expire after N consecutive unresolved dreams
+ASK_EXPIRY_DISTILLS = 3  # asks expire after N consecutive unresolved distills
 STALENESS_BADGE_DAYS = 30  # visual-only badge; no decay in v1 (DOMAIN #8)
 
 # --- Memory (M3) --------------------------------------------------------------
@@ -70,20 +70,35 @@ AUDIT_EVIDENCE_STATEMENTS = 40
 # A disposition (keep|stale|wrong|unsupported) is DECISIVE only when the
 # choice answer's confidence clears this gate; below it the line lands in
 # the review band — surfaced, never silent (same stance as near-misses).
-AUDIT_DISPOSITION_GATE = 0.6
+# 0.8 (2026-09-21, v0.2): raised from 0.6 to the destructive-verdict bar
+# (citation_check cookbook AUTO_ACCEPT stance — start high while trust
+# builds). FakeJev normal mode answers 0.8, so offline decisive runs sit
+# exactly on the inclusive boundary; live grading lands more lines in the
+# surfaced-for-review band on purpose.
+AUDIT_DISPOSITION_GATE = 0.8
 
-# --- First-dream cost bound (M5, review R10) -----------------------------------
+# --- Audit stage 1: deterministic anchor (v0.2) ----------------------------------
 
-# Per-dream candidate cap + user-role-first event ordering (both shipped in
-# M5's engine) bound the first `dream` cost on long-lived projects. Context:
+# A memory line is ANCHORED to a stored fact only when their normalized
+# texts are equal, or one contains the other with the shorter side at
+# least this many characters. The floor kills the trivial-substring trap:
+# without it, any short line ("we use ruff") "verifies" against any fact
+# that happens to contain those words. Below the floor, stage 2 (Jev)
+# grades the line — never silently accepted, never silently anchored.
+ANCHOR_MIN_CHARS = 24
+
+# --- First-distill cost bound (M5, review R10) -----------------------------------
+
+# Per-distill candidate cap + user-role-first event ordering (both shipped in
+# M5's engine) bound the first `distill` cost on long-lived projects. Context:
 # review measured 981 candidates from just 26 machine-wide transcripts, 88%
-# assistant-role; a user's first dream on a long-lived project is the budget
+# assistant-role; a user's first distill on a long-lived project is the budget
 # spike. The cap counts candidate GROUPS (deduped by normalized text + role);
-# events left beyond it stay pending (graded next dream, counted in stats as
+# events left beyond it stay pending (graded next distill, counted in stats as
 # events_deferred). 50 groups is ~2 Phase A requests at the batch budget;
 # None means uncapped (explicit opt-in only — the engine default must bound
-# the first-dream spend). Review S5: an uncapped default is a footgun.
-MAX_CANDIDATES_PER_DREAM: int | None = 50
+# the first-distill spend). Review S5: an uncapped default is a footgun.
+MAX_CANDIDATES_PER_DISTILL: int | None = 50
 
 
 def clamp01(value: float) -> float:

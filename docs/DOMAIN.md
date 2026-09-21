@@ -16,7 +16,7 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 | **Confidence** | A Fact's confidence is exactly `clamp01(2·|durable_noul − 0.5|)` — the certainty of durability. Choice/Score confidences drive their own rules and are never blended in. One formula, in `thresholds.py`. |
 | **Significance** | How much the Fact matters for future work in this project (Score levels trivial→critical). |
 | **Receipt** | The provenance + confidence record attached to every Fact: "who said it, when, how sure are we." |
-| **Dream** | A consolidation run: grade pending candidates, dedupe against existing Facts, resolve conflicts, retire stale Facts, rewrite `jevmory.md`. |
+| **Distill** | A consolidation run: grade pending candidates, dedupe against existing Facts, resolve conflicts, retire stale Facts, rewrite `jevmory.md`. |
 | **Verdict** | The decision for a Fact: `keep`, `supersede`, `retire`, `ask` (low confidence → surface to human). |
 | **Audit** | Grading an *external* memory file (e.g. Claude Code's `MEMORY.md`) line by line: still true / stale / wrong / unsupported, with receipts. |
 | **jevmory.md** | The published memory file at project root — the only artifact agents read. Facts grouped by category, sorted by significance × confidence, each with a receipt line. |
@@ -52,5 +52,5 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 - **ingestion** — session discovery, transcript format parsing (Claude/Codex), Event log, deterministic Statement/Candidate extraction.
 - **judgment** — the Jev client: fan-out batching, budget math, retry/backoff, typed answers, fake client for tests.
 - **memory** — the store: SQLite schema, FTS5 lookup, Fact lifecycle, dedupe/conflict bookkeeping.
-- **dream** — the consolidation engine: the pipeline that composes judgments into verdicts and rewrites jevmory.md.
+- **distill** — the consolidation engine: the pipeline that composes judgments into verdicts and rewrites jevmory.md.
 - **integration** — CLI + hooks (Claude Code `SessionEnd`, Codex `notify`) + `install` command.

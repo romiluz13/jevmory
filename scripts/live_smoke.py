@@ -11,10 +11,10 @@ candidates (below: no project data, no store, no opt-in marker — the
 point is to prove auth, endpoint, envelope parsing, and usage
 accounting against the live API, cheaply).
 
-``--dream`` — ONE real dream run on a project's real store, exactly
-like ``jevmory dream``: requires the grading opt-in marker AND the
+``--distill`` — ONE real distill run on a project's real store, exactly
+like ``jevmory distill``: requires the grading opt-in marker AND the
 key, both checked BEFORE any request. Usage lands in the store's
-``runs.stats`` receipts like every dream. Budget: ``--cap`` API
+``runs.stats`` receipts like every distill. Budget: ``--cap`` API
 requests (default 40, PLAN's smoke ceiling); the cap is enforced by
 ``CountingTransport`` below — every HTTP request including retries
 counts, and the smoke fails closed (run row closed with the error,
@@ -22,7 +22,7 @@ events stay queued) rather than overspending.
 
     python3 scripts/live_smoke.py                        # probe only
     TYPESAFE_API_KEY=... python3 scripts/live_smoke.py --probe
-    TYPESAFE_API_KEY=... python3 scripts/live_smoke.py --dream --project .
+    TYPESAFE_API_KEY=... python3 scripts/live_smoke.py --distill --project .
 
 Exit codes: 0 smoke passed, 1 clean refusal/failure (never a traceback
 swallow — errors print with their run-row fate).
@@ -41,8 +41,8 @@ _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from jevmory.dream.engine import DreamReport, GradingNotEnabledError, run_dream
-from jevmory.dream.writer import (
+from jevmory.distill.engine import DistillReport, GradingNotEnabledError, run_distill
+from jevmory.distill.writer import (
     SentinelError,
     render_jevmory,
     write_jevmory,
@@ -93,7 +93,7 @@ class CountingTransport:
     """Wraps a transport, counting EVERY request (retries included).
 
     Raises ``BudgetExhausted`` (a ``JevError``) when a call would exceed
-    the cap, so the dream engine closes the run row with the error and
+    the cap, so the distill engine closes the run row with the error and
     leaves every event queued — the same recovery path as a rate limit.
     """
 
@@ -153,15 +153,15 @@ def run_probe(
 
 
 @dataclass
-class DreamSmokeResult:
-    """One dream smoke's outcome: the engine report + smoke bookkeeping."""
+class DistillSmokeResult:
+    """One distill smoke's outcome: the engine report + smoke bookkeeping."""
 
-    report: DreamReport
+    report: DistillReport
     artifact: str  # jevmory.md path written (sentinel rules applied)
     budget_calls: int  # requests counted against the cap
 
 
-def run_dream_smoke(
+def run_distill_smoke(
     project_dir: str,
     key: str,
     *,
@@ -170,9 +170,9 @@ def run_dream_smoke(
     transport: Callable[[str, dict[str, str], bytes, float], bytes]
     | None = None,
 ):
-    """One real dream run, budget-capped. Marker + key gate FIRST.
+    """One real distill run, budget-capped. Marker + key gate FIRST.
 
-    Mirrors ``jevmory dream``: same opt-in gate, same store, same
+    Mirrors ``jevmory distill``: same opt-in gate, same store, same
     jevmory.md sentinel rules — the only addition is the request cap.
     """
     marker = optin_path(project_dir)
@@ -186,7 +186,7 @@ def run_dream_smoke(
     conn = connect(store_path(project_dir))
     migrate(conn)
     try:
-        report = run_dream(
+        report = run_distill(
             conn,
             project=project_slug(project_dir),
             client=client,
@@ -206,7 +206,7 @@ def run_dream_smoke(
         ),
         force=force,
     )
-    return DreamSmokeResult(
+    return DistillSmokeResult(
         report=report, artifact=str(artifact), budget_calls=budget.calls
     )
 
@@ -248,7 +248,7 @@ def _print_probe(response: JevResponse, budget: CountingTransport) -> None:
     print("probe: OK — auth, envelope, strict parse, usage all live-verified")
 
 
-def _print_dream(result: DreamSmokeResult) -> None:
+def _print_distill(result: DistillSmokeResult) -> None:
     report = result.report
     run = report.run_id
     print(f"run:          #{run}" if run is not None else "run:          -")
@@ -290,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         "--probe", action="store_true", help="3-candidate synthetic probe (default)"
     )
     mode.add_argument(
-        "--dream", action="store_true", help="one real dream run (needs opt-in)"
+        "--distill", action="store_true", help="one real distill run (needs opt-in)"
     )
     parser.add_argument("--project", metavar="DIR", default=os.getcwd())
     parser.add_argument(
@@ -305,8 +305,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="dream stage: overwrite a foreign jevmory.md "
-        "(same rule as `jevmory dream --force`)",
+        help="distill stage: overwrite a foreign jevmory.md "
+        "(same rule as `jevmory distill --force`)",
     )
     args = parser.parse_args(argv)
 
@@ -323,14 +323,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        if args.dream:
+        if args.distill:
             project = os.path.realpath(os.path.expanduser(args.project))
-            print(f"live smoke — dream on {project} (cap {args.cap} requests)")
-            result = run_dream_smoke(
+            print(f"live smoke — distill on {project} (cap {args.cap} requests)")
+            result = run_distill_smoke(
                 project, key, cap=args.cap, force=args.force
             )
-            _print_dream(result)
-            print("dream smoke: OK")
+            _print_distill(result)
+            print("distill smoke: OK")
             return 0
         print(
             f"live smoke — probe: {args.candidates} synthetic candidates, "

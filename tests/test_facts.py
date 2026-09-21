@@ -355,7 +355,7 @@ class RetrieveTest(StoreTestCase):
 
 class ReceiptsTest(StoreTestCase):
     def test_record_judgment_stores_verbatim_answer(self):
-        run_id = start_run(self.conn, project="proj", kind="dream", now=T0)
+        run_id = start_run(self.conn, project="proj", kind="distill", now=T0)
         jid = record_judgment(
             self.conn, run_id=run_id, subject_kind="candidate",
             subject_id="ev0001", question_id="c0_durable", type="noul",
@@ -395,7 +395,7 @@ class ReceiptsTest(StoreTestCase):
         self.assertIsNone(row[5])
 
     def test_finish_run_records_error(self):
-        run_id = start_run(self.conn, project="proj", kind="dream", now=T0)
+        run_id = start_run(self.conn, project="proj", kind="distill", now=T0)
         finish_run(self.conn, run_id, error="JevRetryExhausted", now=T1)
         row = self.conn.execute(
             "SELECT stats, error FROM runs WHERE id = ?", (run_id,)

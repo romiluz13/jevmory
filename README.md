@@ -23,14 +23,16 @@ disk. jevmory watches, ingests, and grades them:
    hook (Codex CLI) streams transcript events into a per-project SQLite
    store at `~/.jevmory/projects/<slug>.db`. Secrets are redacted at rest,
    before storage. Hooks always exit 0; they can never break a session.
-2. **`jevmory dream` grades while you sleep** — sentence candidates are
+2. **`jevmory distill` grades while you sleep** — sentence candidates are
    extracted, deduped, and (only with your opt-in) sent to the Jev API for
    calibrated judgment: durability, category, significance, support,
    contradiction. Raw judgments are stored — every fact has receipts.
-3. **`jevmory audit MEMORY.md` checks any memory file** — each line is
-   graded against the evidence in the store and printed as a
-   screenshot-shaped report: `STALE / WRONG / UNSUPPORTED / KEEP`, with
-   confidence, support, contradiction, and the run receipt.
+3. **`jevmory audit MEMORY.md` checks any memory file** — lines that
+   match a stored fact verbatim are `VERIFIED` deterministically
+   (zero API spend); the rest are graded against the evidence in the
+   store and printed as a screenshot-shaped report:
+   `STALE / WRONG / UNSUPPORTED / KEEP`, with confidence, support,
+   contradiction, and the run receipt.
 4. **`jevmory.md` lands at your project root** — grouped by category,
    confidence-ordered, every line a verbatim quote with provenance.
    Sentinel-guarded: never overwritten without your say-so.
@@ -56,9 +58,12 @@ jevmory status                   # queued candidates, last ingest, errors
 
 # or opt in to grading (needs $TYPESAFE_API_KEY):
 jevmory init --enable-grading    # per-project opt-in marker
-jevmory dream                    # grade queued candidates
+jevmory distill                    # grade queued candidates
 jevmory audit MEMORY.md          # receipts for every memory line
 jevmory resolve <id>             # answer a contradiction question
+
+# closed network? run grading against a local server (no key):
+jevmory audit MEMORY.md --backend kev   # jaredpalmer/kev on localhost
 ```
 
 Add `jevmory.md` to your project's `.gitignore` if you don't want agent
@@ -85,7 +90,7 @@ your memory has 1 stale line, 1 wrong line, 1 unsupported line; 2 keep
 LINE  VERDICT      CONF  SUPP  CONTRA  CLAIM
    5  STALE        0.82  0.34    0.71  The build runs on Bun; bun run build is the…
    6  WRONG        0.93  0.07    0.93  The test suite runs with pytest.
-   7  UNSUPPORTED  0.74  0.06    0.05  Failed API requests retry up to five times…
+   7  UNSUPPORTED  0.85  0.06    0.05  Failed API requests retry up to five times…
 
 receipts: run 1 · 1 api calls · 838 tokens · evidence: 0 facts, 6 statements
 ```
@@ -97,8 +102,12 @@ judgments behind the numbers.
 
 - **What leaves:** redacted candidate quotes (≤600 chars) + verbatim
   context (≤800 chars) + minimal project context — only during
-  `dream`/`audit` with `$TYPESAFE_API_KEY`
+  `distill`/`audit` with `$TYPESAFE_API_KEY`
   set **and** the project opted in (`jevmory init --enable-grading`).
+  With `--backend kev` nothing leaves the machine at all: grading goes
+  to a local wire-compatible server (`$JEVMORY_KEV_ENDPOINT`,
+  default `127.0.0.1:8009`). The opt-in marker is still required —
+  grading is grading, wherever the model runs.
 - **Never:** whole transcripts, transcript metadata (the project context
   is just the project name — no file paths), or secrets (redacted at
   rest, before any storage — `sk-*`, AWS keys, GitHub tokens, JWTs, PEM
@@ -128,28 +137,40 @@ judgments behind the numbers.
    `runs`/`judgments` tables — so any number in the report can be
    traced to the API call that produced it.
 
-## Live smoke (lead-run)
+## Live smoke and fidelity benchmark (lead-run)
 
-The one network path is pinned by a budget-capped smoke script:
+The network paths are pinned by budget-capped scripts:
 
 ```sh
 TYPESAFE_API_KEY=… python3 scripts/live_smoke.py --probe   # 3 synthetic candidates, 1 request
-TYPESAFE_API_KEY=… python3 scripts/live_smoke.py --dream   # 1 real dream run, capped
+TYPESAFE_API_KEY=… python3 scripts/live_smoke.py --distill   # 1 real distill run, capped
+python3 scripts/bench_fidelity.py                           # offline: anchor floor + self-check
+TYPESAFE_API_KEY=… python3 scripts/bench_fidelity.py --live  # real model confusion matrix
 ```
 
-Hard cap on requests (`--cap`, default 40, PLAN's smoke ceiling);
-`BudgetExhausted` is a `JevError`, so the run row closes and events stay
-queued — the smoke cannot overspend. Live-verified against the real API:
-probe (auth, envelope, strict parse, usage accounting), a capped dream
-over real transcripts, and a live audit that caught a planted wrong line
-with receipts in the store's `runs`/`judgments` tables.
+The smoke is hard-capped on requests (`--cap`, default 40, PLAN's smoke
+ceiling); `BudgetExhausted` is a `JevError`, so the run row closes and
+events stay queued — the smoke cannot overspend. Live-verified against
+the real API: probe (auth, envelope, strict parse, usage accounting), a
+capped distill over real transcripts, and a live audit that caught a
+planted wrong line with receipts in the store's `runs`/`judgments`
+tables.
+
+The fidelity benchmark runs a planted-truth fixture (3 verbatim truths,
+a stale line quoting a superseded fact, a one-word mutation, an
+unsupported claim): offline it proves the deterministic anchor stage —
+3/3 verbatim recall, zero false anchors — and self-checks the full
+pipeline against an ideal scripted model; `--live` measures the real
+model's end-to-end confusion matrix on the same fixture.
 
 ## Status
 
-508 offline tests (`python3 -m unittest discover`) — no network, no API
+553 offline tests (`python3 -m pytest tests/ -q`) — no network, no API
 key, FakeJev including adversarial mode. Modules M0–M7 complete;
-pipeline live-verified against the real Jev API (probe, capped dream,
-audit).
+pipeline live-verified against the real Jev API (probe, capped distill,
+audit). v0.2: two-stage audit with deterministic `VERIFIED` anchoring,
+vintage receipts (`said … · verified …`), and the `kev` local grading
+backend.
 
 ## License
 
