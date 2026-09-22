@@ -2,8 +2,7 @@
 
 Built from REAL files observed on 2026-09-19 under
 ``~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl`` on this
-machine (1,077 files). Field shapes relied on (recorded in
-``.ddd/notes/jev-md.md``):
+machine (1,077 files). Field shapes relied on:
 
 - One JSON object per line: {"timestamp": ISO-8601 UTC, "ordinal": int,
   "type": "session_meta" | "response_item" | "event_msg" |

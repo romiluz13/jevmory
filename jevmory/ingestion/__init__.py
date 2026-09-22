@@ -3,7 +3,7 @@
 Statement/Candidate extraction.
 
 Parsers are built from real transcripts observed on this machine
-(2026-09-19/20); observed schemas are recorded in ``.ddd/notes/jev-md.md``.
+(2026-09-19/20).
 Statements are raw/verbatim from parsers; redaction happens at the
 storage boundary (``EventLog.append``, DOMAIN #6). DDL lives in
 ``jevmory.memory.schema`` (review R7), never here.

@@ -62,6 +62,5 @@ If that prints `OK`, you have a working development environment.
   `judgment/` (Jev client, FakeJev), `memory/` (SQLite store, facts,
   receipts), `audit/` (memory-file grading, reports), `distill/`
   (grading engine, `jevmory.md` writer), plus `cli.py` and `hook.py`
-- `.ddd/notes/` — the running decision log
 - `demo/` — the offline planted-error demo; `scripts/live_smoke.py` —
   the budget-capped live-API smoke

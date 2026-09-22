@@ -2,8 +2,7 @@
 
 Built from REAL files observed on 2026-09-20 under
 ``~/.factory/sessions/<project-dir-slug>/<uuid>.jsonl`` on this machine
-(census pass over all 1,061 files, 206,743 message lines; recorded in
-``.ddd/notes/jev-md.md``):
+(census pass over all 1,061 files, 206,743 message lines):
 
 - One JSON object per line: {"type": "session_start" | "message" |
   "todo_state" | "agent_turn_outcome" | "compaction_state", ...}. The

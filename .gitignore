@@ -9,3 +9,8 @@ jevmory.md
 
 # editable-install build cruft
 jevmory.egg-info/
+
+# internal working notes (kept locally, never published)
+.team/
+.ddd/
+docs/research/

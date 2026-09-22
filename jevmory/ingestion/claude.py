@@ -2,8 +2,7 @@
 
 Built from REAL files observed on 2026-09-19 under
 ``~/.claude/projects/<project-slug>/<sessionId>.jsonl`` on this machine
-(15 files: 372 ``user``, 526 ``assistant``, 18 ``system`` lines). Field
-shapes relied on (recorded in ``.ddd/notes/jev-md.md``):
+(15 files: 372 ``user``, 526 ``assistant``, 18 ``system`` lines). Field shapes relied on:
 
 - One JSON object per line. Lines with ``type`` == "user" or "assistant"
   are message lines; all other observed line types (``mode``,

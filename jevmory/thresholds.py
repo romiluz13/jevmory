@@ -1,9 +1,7 @@
 """Named thresholds for every tunable decision in jevmory.md (PLAN v2).
 
 One module, named constants: the gates, budgets, and bounds that code
-applies but never invents inline. Priors, hand-tuned on the fixture
-corpus before the demo; every tuning change is recorded in the DDD note
-(``.ddd/notes/jev-md.md``) per the threshold policy.
+applies but never invents inline. Priors, hand-tuned on the fixture corpus before the demo.
 
 Confidence — one formula (DOMAIN "Confidence", PLAN "Confidence")::
 

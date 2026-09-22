@@ -1,8 +1,6 @@
 # jevmory.md — implementation plan (v2, post-review)
 
-Status: v2 — incorporates Kimi's plan attack (`.team/kimi/findings-plan.md`); all
-blockers/majors accepted, adjudication logged in `.ddd/notes/jev-md.md`.
-Owner: GLM (code), Kimi (review), lead (decisions). Method: DDD.
+Status: v2 — post-review; all blockers/majors accepted. Method: DDD.
 
 v2 changes from v1 (what GLM must re-read):
 1. **Privacy (was F5.1/F5.2, blockers)**: hooks ingest locally only; grading requires
