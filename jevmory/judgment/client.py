@@ -206,7 +206,9 @@ class JevClient:
         for qid, question in questions.items():
             if qid not in answers_raw:
                 raise JevProtocolError(f"no answer for question {qid!r}")
-            parsed[qid] = parse_answer(question.type, answers_raw[qid])
+            parsed[qid] = parse_answer(
+                question.type, answers_raw[qid], criteria=question.criteria
+            )
 
         usage = self._parse_usage(envelope.get("usage"))
         model = envelope.get("model", DEFAULT_MODEL)

@@ -7,8 +7,8 @@ distill engine (M5) composes into verdicts:
 
 - **add** an active fact (confidence = the one formula, receipts land
   in ``judgments`` via ``record_judgment``);
-- **code-level dedupe** (zero Jev spend): normalized-claim hash equal,
-  or Jaccard ≥ ``JACCARD_GATE`` against an existing ACTIVE fact;
+- **code-level dedupe** (zero Jev spend): normalized whole-claim equality
+  against an existing ACTIVE fact;
 - **retrieve** similar facts: FTS5 fetch ``FTS_RETRIEVE_K`` = 10, then
   re-rank by token overlap and keep ``FTS_KEEP_TOP`` = 5 — these become
   the Phase B pair partners;
@@ -16,7 +16,7 @@ distill engine (M5) composes into verdicts:
   ``supersede`` / ``retire`` (row KEPT for provenance, removed from
   FTS); low-confidence conflict → ``mark_ask`` (+ ``bump_ask`` counting
   consecutive unresolved distills; expiry disposition is M5's call);
-  audit stage-1 anchor hit → ``mark_verified`` (vintage marker, v3).
+  old audit vintage markers remain readable for compatibility.
 
 FTS maintenance rule (PLAN "FTS maintenance"): only ACTIVE facts are
 ever indexed in ``facts_fts`` — retire/supersede delete the FTS row via
@@ -43,7 +43,6 @@ from typing import Any, Sequence
 from jevmory.thresholds import (
     FTS_KEEP_TOP,
     FTS_RETRIEVE_K,
-    JACCARD_GATE,
     fact_confidence,
 )
 
@@ -336,14 +335,10 @@ def add_link(
 def mark_verified(
     conn: sqlite3.Connection, fact_id: int, *, now: str | None = None
 ) -> Fact:
-    """Stage-1 audit write-back (schema v3): stamp ``verified_at``.
+    """Legacy audit-mark setter retained for Python API compatibility.
 
-    The deterministic anchor check confirmed this fact's claim verbatim
-    against a memory line — a string-equality receipt, not a model
-    judgment, so the timestamp is a hard provenance mark. Never over-
-    writes a fact's status or confidence; NULL -> timestamp is the only
-    intended transition (a fact re-verified later keeps the latest
-    stamp, matching "when did I last check this").
+    This timestamp is not factual verification. Current audits never call
+    this helper; they record MATCHED provenance without refreshing facts.
     """
     fact = get_fact(conn, fact_id)
     if fact is None:
@@ -528,19 +523,14 @@ def jaccard(tokens_a: Sequence[str], tokens_b: Sequence[str]) -> float:
 def find_code_duplicate(
     conn: sqlite3.Connection,
     claim: str,
-    *,
-    jaccard_gate: float = JACCARD_GATE,
 ) -> tuple[Fact, float] | None:
     """Code-level duplicate of ``claim`` among ACTIVE facts, or None.
 
-    Hash-equal (normalized) scores 1.0; otherwise the best Jaccard at or
-    above the gate wins. Only active facts participate (same rule as
-    FTS). The store is one db per project, so scanning all active rows
-    IS the project scope.
+    Only normalized whole-claim equality proves a duplicate without a
+    judgment. Lexical overlap belongs in retrieval: negated claims can
+    share nearly every token. Only active facts participate.
     """
     normalized = normalize_claim(claim)
-    tokens = claim_tokens(claim)
-    best: tuple[Fact, float] | None = None
     for row in conn.execute(
         f"SELECT {_FACT_COLUMNS} FROM facts WHERE status = ? ORDER BY id",
         (STATUS_ACTIVE,),
@@ -548,11 +538,7 @@ def find_code_duplicate(
         fact = _row_to_fact(row)
         if normalize_claim(fact.claim) == normalized:
             return fact, 1.0
-        score = jaccard(tokens, claim_tokens(fact.claim))
-        if score >= jaccard_gate:
-            if best is None or score > best[1]:
-                best = (fact, score)
-    return best
+    return None
 
 
 # --- FTS retrieval ------------------------------------------------------------

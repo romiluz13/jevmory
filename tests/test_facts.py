@@ -38,7 +38,6 @@ from jevmory.memory.facts import (
     supersede,
 )
 from jevmory.memory.schema import connect, migrate
-from jevmory.thresholds import JACCARD_GATE
 
 T0 = "2026-09-19T00:00:00Z"
 T1 = "2026-09-19T00:01:00Z"
@@ -237,14 +236,12 @@ class DedupeTest(StoreTestCase):
         self.assertEqual(found[0].id, fact.id)
         self.assertEqual(found[1], 1.0)
 
-    def test_jaccard_duplicate_above_gate(self):
-        fact = self.add("Always run make lint before pushing to main.")
+    def test_similar_wording_requires_a_semantic_comparison(self):
+        self.add("Always run make lint before pushing to main.")
         found = find_code_duplicate(
             self.conn, "Always run make lint before pushing to main branch."
         )
-        self.assertIsNotNone(found)
-        self.assertEqual(found[0].id, fact.id)
-        self.assertGreaterEqual(found[1], JACCARD_GATE)
+        self.assertIsNone(found)
 
     def test_below_gate_is_not_a_duplicate(self):
         self.add("Always run make lint before pushing to main.")
@@ -258,40 +255,23 @@ class DedupeTest(StoreTestCase):
         kept = self.add("Use bun for package installs.")
         retired = self.add("Deployments go through the platform CLI.")
         retire(self.conn, retired.id)
-        # near-identical to the RETIRED fact, dissimilar from the kept one
         found = find_code_duplicate(
-            self.conn, "Deployments go through the platform CLI nightly."
+            self.conn, retired.claim
         )
-        # retired fact must not match; the kept claim has no overlap
         self.assertIsNone(found)
-        # sanity: it WOULD have matched had the fact stayed active
-        self.assertGreater(
-            jaccard(
-                claim_tokens("Deployments go through the platform CLI nightly."),
-                claim_tokens("Deployments go through the platform CLI."),
-            ),
-            JACCARD_GATE,
-        )
-        # and a near-identical claim still matches the ACTIVE fact
         found_kept = find_code_duplicate(
-            self.conn, "Use bun for package installs, always."
+            self.conn, kept.claim
         )
         self.assertEqual(found_kept[0].id, kept.id)
 
-    def test_best_jaccard_match_wins(self):
-        weak = self.add("Run make lint sometimes before pushing.")
+    def test_exact_match_wins_over_similar_wording(self):
+        self.add("Run make lint sometimes before pushing.")
         strong = self.add("Always run make lint before pushing to main.")
         found = find_code_duplicate(
-            self.conn, "Always run make lint before pushing to main now."
+            self.conn, strong.claim
         )
         self.assertEqual(found[0].id, strong.id)
-        self.assertGreater(
-            found[1],
-            jaccard(
-                claim_tokens("Always run make lint before pushing to main now."),
-                claim_tokens(weak.claim),
-            ),
-        )
+        self.assertEqual(found[1], 1.0)
 
 
 class RetrieveTest(StoreTestCase):

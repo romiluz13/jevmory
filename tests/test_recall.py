@@ -112,6 +112,22 @@ class RenderRecallTest(RecallTestCase):
         store.write_bytes(b"this is not sqlite")
         self.assertIsNone(render_recall(str(self.project), home=self.home))
 
+    def test_recall_does_not_upgrade_an_old_schema(self):
+        self.seed("We use uv, never pip.")
+        conn = connect(store_path(str(self.project), home=self.home))
+        conn.execute("UPDATE schema_version SET version = 2")
+        conn.commit()
+        before = tuple(conn.iterdump())
+        conn.close()
+
+        self.assertIsNone(render_recall(str(self.project), home=self.home))
+
+        conn = connect(store_path(str(self.project), home=self.home))
+        try:
+            self.assertEqual(tuple(conn.iterdump()), before)
+        finally:
+            conn.close()
+
 
 class RunRecallTest(RecallTestCase):
     def _stdout(self, argv, stdin_text):

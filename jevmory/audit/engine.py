@@ -6,8 +6,8 @@ Composes the M2/M3/M4 layers into one run:
    spend, no run row);
 2. STAGE 1 — deterministic anchor check against the project's active
    facts (``audit/anchor.py``): a line whose normalized text matches a
-   stored fact is VERIFIED for zero Jev spend, and the matched fact's
-   ``verified_at`` vintage marker is written back;
+   stored fact is MATCHED for zero Jev spend. This establishes stored
+   provenance only and never refreshes a verification timestamp;
 3. STAGE 2 — everything unanchored: assemble the evidence pool (the
    ``AUDIT_EVIDENCE_FACTS`` most recent active facts and the
    ``AUDIT_EVIDENCE_STATEMENTS`` most recently ingested statements,
@@ -52,7 +52,6 @@ from jevmory.judgment.errors import JevError
 from jevmory.memory.facts import (
     active_facts,
     finish_run,
-    mark_verified,
     record_judgment,
     start_run,
 )
@@ -98,9 +97,6 @@ def run_audit(
         for line in lines
         if line.id in anchors
     ]
-    for fact in anchors.values():
-        mark_verified(conn, fact.id, now=now)  # vintage write-back
-
     # --- stage 2: model pipeline for the unanchored remainder --------------
     unanchored = [line for line in lines if line.id not in anchors]
     api_calls = 0

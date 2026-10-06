@@ -16,7 +16,7 @@ never blended into anything (DOMAIN "Confidence").
 
 Stage 1 (v0.2, ``audit/anchor.py``) runs before any of this: a line
 that matches a stored fact verbatim gets an ``anchored_verdict``
-(VERIFIED) without a model call — its "confidence" is a deterministic
+(MATCHED) without a model call — its "confidence" is a deterministic
 receipt, outside this module's gate entirely.
 """
 
@@ -41,7 +41,9 @@ DISPOSITION_KEYWORDS = {
 REVIEW = "REVIEW"
 # Stage-1 anchor verdict (v0.2): the line matches a stored fact's claim
 # verbatim (normalized) — a string-equality receipt, not a model judgment.
-VERIFIED = "VERIFIED"
+MATCHED = "MATCHED"
+# Keep the Python import compatible; the report keyword is now MATCHED.
+VERIFIED = MATCHED
 
 # Stable receipt question keys (judgments.question_id for subject_kind
 # 'line' — see audit/questions.py docstring for why not l{i}_ ids).
@@ -67,14 +69,16 @@ class LineVerdict:
     def keyword(self) -> str:
         """The verdict keyword for the terminal report."""
         if self.anchored:
-            return VERIFIED
+            return MATCHED
         if not self.decisive:
             return REVIEW
         return DISPOSITION_KEYWORDS[self.disposition]
 
 
 def anchored_verdict(line: MemoryLine, fact: Fact) -> LineVerdict:
-    """Stage-1 verdict: the line IS the stored fact, verbatim.
+    """Stage-1 verdict: the line matches the stored statement.
+
+    This proves a match, not truth; the fact may be wrong or outdated.
 
     Confidence 1.0 is the string-equality receipt — deterministic, not
     model calibration — so it is never blended, never gated, and never
@@ -134,10 +138,10 @@ def line_verdict(
 
 
 def count_dispositions(verdicts: Sequence[LineVerdict]) -> dict[str, int]:
-    """Counts per verdict keyword (keep/stale/wrong/unsupported/review/verified)."""
+    """Counts per verdict keyword (keep/stale/wrong/unsupported/review/matched)."""
     counts = {
         keyword: 0
-        for keyword in (*DISPOSITION_KEYWORDS.values(), REVIEW, VERIFIED)
+        for keyword in (*DISPOSITION_KEYWORDS.values(), REVIEW, MATCHED)
     }
     for verdict in verdicts:
         counts[verdict.keyword] += 1

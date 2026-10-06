@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 from jevmory.audit.rules import (
-    VERIFIED,
+    MATCHED,
     LineVerdict,
     REVIEW,
     count_dispositions,
@@ -73,19 +73,19 @@ class AuditReport:
             for keyword, noun in phrases
             if self.counts.get(keyword)
         ]
-        verified = self.counts.get(VERIFIED, 0)
+        matched = self.counts.get(MATCHED, 0)
         if not problems:
-            summary = (
-                f"all {len(self.lines)} lines hold up — "
-                "nothing stale, nothing wrong"
-            )
+            summary = f"no problems found in stored evidence for {len(self.lines)} lines"
         else:
             summary = "your memory has " + ", ".join(problems)
             keeps = sum(1 for v in self.lines if v.keyword == "KEEP")
             if keeps:
                 summary += f"; {keeps} keep"
-        if verified:
-            summary += f"; {verified} verified verbatim (no api call)"
+        if matched:
+            summary += (
+                f"; {matched} matched stored statements (no api call); "
+                "current correctness not checked"
+            )
         return summary
 
 

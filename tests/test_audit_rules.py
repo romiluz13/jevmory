@@ -141,7 +141,7 @@ class CountDispositionsTest(unittest.TestCase):
         self.assertEqual(counts["KEEP"], 2)
         self.assertEqual(counts["STALE"], 1)
         self.assertEqual(counts[REVIEW], 1)
-        self.assertEqual(counts["VERIFIED"], 1)
+        self.assertEqual(counts["MATCHED"], 1)
         self.assertEqual(counts["WRONG"], 0)
 
 

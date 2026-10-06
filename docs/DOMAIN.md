@@ -13,7 +13,7 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 | **Candidate** | A Statement that might deserve to become a Fact. Deterministically extracted, then judged. |
 | **Fact** | An active, graded Statement in the memory store: verbatim claim + verbatim context (surrounding exchanges) + category + significance + confidence + provenance (source event ids) + lifecycle status. |
 | **Judgment** | One typed Jev answer (Noul / Choice / Score) about a state. Judgments are evidence, stored verbatim in the judgments table — every number in jevmory.md is reproducible from stored receipts. |
-| **Confidence** | A Fact's confidence is exactly `clamp01(2·|durable_noul − 0.5|)` — the certainty of durability. Choice/Score confidences drive their own rules and are never blended in. One formula, in `thresholds.py`. |
+| **Confidence** | A Fact's confidence is exactly `clamp01(2·|durable_noul − 0.5|)` — certainty of durability, not truth or current-code verification. Choice/Score confidences drive their own rules and are never blended in. One formula, in `thresholds.py`. |
 | **Significance** | How much the Fact matters for future work in this project (Score levels trivial→critical). |
 | **Receipt** | The provenance + confidence record attached to every Fact: "who said it, when, how sure are we." |
 | **Distill** | A consolidation run: grade pending candidates, dedupe against existing Facts, resolve conflicts, retire stale Facts, rewrite `jevmory.md`. |
@@ -25,6 +25,13 @@ Everything below is one context; sub-domains are modules, not separate contexts.
 | **MCP server** | The agent-agnostic surface (`jevmory mcp`, stdio JSON-RPC): three read-only tools — `status`, `recall`, `fact` — so any MCP client (Claude Code, Codex CLI, Cursor) can query the store without agent-specific wiring. |
 
 ## Invariants (the domain's laws)
+
+Whole-claim equality establishes a memory match, not truth. `MATCHED`
+audit results never refresh verification timestamps. Lexical overlap is
+retrieval evidence and cannot certify duplicate claims. Recall and MCP
+never migrate schema or mutate database data; explicit CLI operations own
+migrations. Historic `verified_at` values remain readable as legacy audit
+marks. SQLite can still manage WAL sidecars for concurrent readers.
 
 1. **No generation.** jevmory.md never writes a sentence that wasn't said by a human or
    agent in a session. Jev judges; code selects and composes. (System One cannot

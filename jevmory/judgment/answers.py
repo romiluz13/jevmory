@@ -59,7 +59,7 @@ class ScoreAnswer:
     confidence: float = 0.0
 
 
-def parse_answer(expected_type: str, raw: Any) -> object:
+def parse_answer(expected_type: str, raw: Any, *, criteria: Any = None) -> object:
     """Parse one raw answer dict against the question's declared type.
 
     Raises ``JevProtocolError`` on any shape/range violation; raises
@@ -81,8 +81,18 @@ def parse_answer(expected_type: str, raw: Any) -> object:
     if expected_type == NOUL:
         return _parse_noul(raw)
     if expected_type == CHOICE:
-        return _parse_choice(raw)
-    return _parse_score(raw)
+        answer = _parse_choice(raw)
+        if criteria is not None and set(answer.probabilities) != set(criteria):
+            raise JevProtocolError("choice options differ from requested criteria")
+        return answer
+    answer = _parse_score(raw)
+    if criteria is not None:
+        levels = {str(index) for index in range(len(criteria))}
+        if set(answer.probabilities) != levels or set(answer.legend) != levels:
+            raise JevProtocolError("score levels differ from requested criteria")
+        if not 0.0 <= answer.score <= len(criteria) - 1:
+            raise JevProtocolError("score outside requested level range")
+    return answer
 
 
 def _parse_noul(raw: Mapping[str, Any]) -> NoulAnswer:

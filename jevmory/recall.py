@@ -32,7 +32,7 @@ from pathlib import Path
 from .hook import extract_payload
 from .ingestion.eventlog import project_slug, store_path
 from .memory.facts import active_facts
-from .memory.schema import connect, migrate
+from .memory.schema import connect_readonly
 
 # Context economy: cap lines and claim length so the injection stays
 # small even for projects with long histories.
@@ -66,11 +66,10 @@ def render_recall(
     if not path.exists():
         return None
     try:
-        conn = connect(path)
+        conn = connect_readonly(path)
     except Exception:  # noqa: BLE001 - never-die: silent, not fatal
         return None
     try:
-        migrate(conn)
         facts = active_facts(conn, project=project_slug(project_dir))
     except Exception:  # noqa: BLE001
         return None
@@ -82,17 +81,20 @@ def render_recall(
     facts = sorted(facts, key=lambda f: (-f.confidence, f.id))[:limit]
     lines = [
         f"jevmory — remembered facts for {Path(project_dir).name} "
-        f"(verbatim quotes, confidence-ordered):"
+        f"(verbatim quotes, durability-confidence-ordered):"
     ]
     for fact in facts:
         claim = fact.claim if len(fact.claim) <= CLAIM_WIDTH else (
             fact.claim[: CLAIM_WIDTH - 1].rstrip() + "…"
         )
-        vintage = fact.verified_at or "unverified"
+        vintage = (
+            f"legacy audit mark {fact.verified_at[:10]}"
+            if fact.verified_at else "unverified"
+        )
         lines.append(
             f"- {claim}  "
-            f"[conf {fact.confidence:.2f} · said {fact.created_at[:10]} "
-            f"· verified {vintage[:10] if fact.verified_at else vintage}]"
+            f"[durability conf {fact.confidence:.2f} · said {fact.created_at[:10]} "
+            f"· {vintage}]"
         )
     lines.append(
         "full memory: jevmory.md at the project root — "

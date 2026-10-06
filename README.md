@@ -37,7 +37,8 @@ that evidence, verdict by verdict.
 
 - 🎯 **Verbatim facts, zero generation** — no LLM generation anywhere.
   [Jev](https://typesafe.ai) judges; code selects and composes. Facts
-  are quotes with verbatim context, so the memory can't hallucinate.
+  are quotes with verbatim context. A faithfully stored quote can still
+  be wrong or outdated; provenance does not establish truth.
 - 🔌 **Agent-agnostic** — a one-command Claude Code plugin, an MCP
   server (`status` / `recall` / `fact`) for Codex CLI, Cursor, and any
   MCP client, and Codex notify hooks. Same store, same receipts.
@@ -133,13 +134,23 @@ flowchart LR
     DB -->|"MCP: status · recall · fact"| MCP["any MCP client"]
 ```
 
-Hooks ingest locally and always exit 0 — they can never break a session.
+Hooks ingest locally and return 0 on handled failures; host timeouts still apply.
 `distill` extracts and dedupes sentence candidates, then (only with your
 opt-in) grades them: durability, category, significance, support,
-contradiction. `audit` anchors lines that match a stored fact verbatim as
-`VERIFIED` deterministically (zero API spend) and grades the rest against
-the store's evidence. `jevmory.md` lands at the project root — grouped by
-category, confidence-ordered, sentinel-guarded against silent overwrites.
+contradiction. Only normalized whole-claim equality bypasses semantic
+comparison; similar wording can change or negate a policy. `audit` labels
+whole lines matching an active stored statement as `MATCHED` (zero API spend)
+and grades the rest against the store's evidence. Matching does not check
+current code or refresh a verification date. Stored confidence measures
+durability. `jevmory.md` lands at the project root — grouped by category,
+ordered by significance and durability confidence, sentinel-guarded against
+silent overwrites.
+
+MCP and SessionStart recall open the database read-only and never migrate
+its schema. Upgrade an older store explicitly with `jevmory init --project
+/path/to/project` using a compatible CLI. SQLite may manage WAL sidecars;
+read-only refers to database data and schema. An unavailable or incompatible
+store produces no SessionStart facts; MCP returns migration guidance.
 
 Design laws and domain model: [docs/DOMAIN.md](docs/DOMAIN.md).
 
@@ -159,11 +170,11 @@ Design laws and domain model: [docs/DOMAIN.md](docs/DOMAIN.md).
 
 ## Status
 
-**Active.** 595 offline tests (the same `python -m unittest discover`
+**Active.** 606 offline tests (the same `python -m unittest discover`
 CI runs on 3.10–3.13) — no network, no API key, FakeJev including
 adversarial mode. Modules M0–M7 complete; pipeline live-verified against
 the real Jev API (probe, capped distill, audit). v0.2: two-stage audit
-with deterministic `VERIFIED` anchoring, vintage receipts, and the `kev`
+with deterministic memory matching, vintage receipts, and the `kev`
 local grading backend. v0.3: plug-and-play — a self-contained Claude Code
 plugin (marketplace + hooks + MCP tools + command), an agent-agnostic MCP
 server for Codex/Cursor, and SessionStart recall injection; both plugin

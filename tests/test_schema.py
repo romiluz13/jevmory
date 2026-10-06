@@ -11,6 +11,7 @@ from jevmory.memory.schema import (
     SCHEMA_VERSION,
     SchemaVersionError,
     connect,
+    connect_readonly,
     create_all,
     current_version,
     migrate,
@@ -116,6 +117,30 @@ class FreshStoreTest(unittest.TestCase):
         timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
         self.assertEqual(mode, "wal")
         self.assertEqual(timeout, 5000)
+
+    def test_readonly_connection_sees_committed_wal_and_rejects_writes(self):
+        writer = connect(self.db)
+        self.addCleanup(writer.close)
+        migrate(writer)
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute(
+            "INSERT INTO events (id, project, source, text, created_at) "
+            "VALUES ('fresh', 'p', 'test', 'new committed evidence', 'now')"
+        )
+        writer.commit()
+
+        reader = connect_readonly(self.db)
+        self.addCleanup(reader.close)
+        self.assertEqual(reader.execute(
+            "SELECT text FROM events WHERE id = 'fresh'"
+        ).fetchone()[0], "new committed evidence")
+        with self.assertRaises(sqlite3.OperationalError):
+            reader.execute("DELETE FROM events")
+
+    def test_readonly_connection_does_not_create_a_missing_store(self):
+        with self.assertRaises(sqlite3.OperationalError):
+            connect_readonly(self.db)
+        self.assertFalse(self.db.exists())
 
     def test_fts_external_content_wiring_works(self):
         conn = connect(self.db)

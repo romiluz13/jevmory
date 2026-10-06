@@ -1,5 +1,5 @@
-"""Stage-1 anchor tests (v0.2): deterministic containment, the
-trivial-substring floor, oldest-match determinism, no coin flips."""
+"""Stage-1 anchor tests (v0.2): whole-claim equality,
+substring refusal, oldest-match determinism, no coin flips."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import unittest
 
 from jevmory.audit.anchor import anchor_line, anchor_map
 from jevmory.memory.facts import Fact
-from jevmory.thresholds import ANCHOR_MIN_CHARS
 
 
 def make_fact(fact_id, claim, status="active"):
@@ -32,15 +31,15 @@ class AnchorLineTest(unittest.TestCase):
             anchor_line(LONG_DRIFT, facts), facts[0]
         )
 
-    def test_containment_anchors_when_shorter_side_meets_floor(self):
+    def test_containment_requires_semantic_review(self):
         # the memory line CONTAINS the fact (fact is the shorter side)
         fact = make_fact(1, LONG)
         line = f"reminder: {LONG} — every time, no exceptions"
-        self.assertIs(anchor_line(line, [fact]), fact)
+        self.assertIsNone(anchor_line(line, [fact]))
         # the fact CONTAINS the line (line is the shorter side, still
         # at/above the floor)
         wrapper = make_fact(2, f"note: {LONG} — pinned by the team")
-        self.assertIs(anchor_line(LONG, [wrapper]), wrapper)
+        self.assertIsNone(anchor_line(LONG, [wrapper]))
 
     def test_short_substring_never_anchors(self):
         # the trivial-substring trap: without the floor, "we use ruff"
@@ -48,13 +47,9 @@ class AnchorLineTest(unittest.TestCase):
         facts = [make_fact(1, "we use ruff and mypy, configured in pyproject")]
         self.assertIsNone(anchor_line("we use ruff", facts))
 
-    def test_boundary_at_the_floor_is_inclusive(self):
-        exact = "x" * ANCHOR_MIN_CHARS
-        facts = [make_fact(1, f"context around {exact} and more")]
-        self.assertIsNotNone(anchor_line(exact, facts))
-        # one char under: no anchor, stage 2 grades it
-        short = "x" * (ANCHOR_MIN_CHARS - 1)
-        self.assertIsNone(anchor_line(short, facts))
+    def test_short_whole_claim_can_match_without_a_substring_floor(self):
+        fact = make_fact(1, "we use ruff")
+        self.assertIs(anchor_line("we use ruff", [fact]), fact)
 
     def test_oldest_match_wins_deterministically(self):
         older, newer = make_fact(1, LONG), make_fact(2, LONG_DRIFT)

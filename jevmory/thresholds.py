@@ -46,7 +46,6 @@ STALENESS_BADGE_DAYS = 30  # visual-only badge; no decay in v1 (DOMAIN #8)
 
 FTS_RETRIEVE_K = 10  # similar active facts fetched from facts_fts per new fact
 FTS_KEEP_TOP = 5  # kept after re-rank by token overlap -> Phase B pairs
-JACCARD_GATE = 0.6  # code-level dedupe: normalized-hash equal OR Jaccard >= 0.6
 
 # --- Judgment transport / budget (M2) -----------------------------------------
 
@@ -76,14 +75,6 @@ AUDIT_EVIDENCE_STATEMENTS = 40
 AUDIT_DISPOSITION_GATE = 0.8
 
 # --- Audit stage 1: deterministic anchor (v0.2) ----------------------------------
-
-# A memory line is ANCHORED to a stored fact only when their normalized
-# texts are equal, or one contains the other with the shorter side at
-# least this many characters. The floor kills the trivial-substring trap:
-# without it, any short line ("we use ruff") "verifies" against any fact
-# that happens to contain those words. Below the floor, stage 2 (Jev)
-# grades the line — never silently accepted, never silently anchored.
-ANCHOR_MIN_CHARS = 24
 
 # --- First-distill cost bound (M5, review R10) -----------------------------------
 

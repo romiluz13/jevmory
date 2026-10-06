@@ -114,6 +114,45 @@ class EnvelopeTest(unittest.TestCase):
         ).ask(STATE, ONE)
         self.assertEqual(sorted(response.answers), ["c0_durable"])
 
+    def test_response_cannot_invent_choice_options(self):
+        question = phase_a_questions(1)["c0_category"]
+        raw = {"type": "choice", "choice": "invented_category",
+               "probabilities": {"invented_category": 1.0}, "confidence": 1.0}
+        with self.assertRaises(JevProtocolError):
+            self.client([{"response": envelope({"c0_category": raw})}]).ask(
+                STATE, {"c0_category": question}
+            )
+
+    def test_response_cannot_invent_score_levels(self):
+        question = phase_a_questions(1)["c0_significance"]
+        raw = {"type": "score", "score": 50,
+               "legend": {"0": "low", "100": "high"},
+               "probabilities": {"0": 0.5, "100": 0.5}, "confidence": 1.0}
+        with self.assertRaises(JevProtocolError):
+            self.client([{"response": envelope({"c0_significance": raw})}]).ask(
+                STATE, {"c0_significance": question}
+            )
+
+    def test_requested_score_levels_accept_a_legitimate_answer(self):
+        question = phase_a_questions(1)["c0_significance"]
+        raw = {"type": "score", "score": 1.5,
+               "legend": {str(i): label for i, label in enumerate(question.criteria)},
+               "probabilities": {"0": 0.0, "1": 0.5, "2": 0.5, "3": 0.0},
+               "confidence": 0.5}
+        response = self.client([
+            {"response": envelope({"c0_significance": raw})}
+        ]).ask(STATE, {"c0_significance": question})
+        self.assertEqual(response.answers["c0_significance"].score, 1.5)
+
+    def test_choice_must_return_every_requested_option(self):
+        question = phase_a_questions(1)["c0_category"]
+        raw = {"type": "choice", "choice": "tooling",
+               "probabilities": {"tooling": 1.0}, "confidence": 1.0}
+        with self.assertRaises(JevProtocolError):
+            self.client([{"response": envelope({"c0_category": raw})}]).ask(
+                STATE, {"c0_category": question}
+            )
+
     def test_missing_answer_raises_protocol_error(self):
         with self.assertRaises(JevProtocolError):
             self.client([{"response": envelope({})}]).ask(STATE, ONE)

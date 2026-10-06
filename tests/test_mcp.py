@@ -103,6 +103,26 @@ class ToolsTest(McpTestCase):
         text = self._call("status", project=str(self.project))
         self.assertIn("no store yet for proj", text)
 
+    def test_status_refuses_old_schema_without_migrating_it(self):
+        self.seed("We use uv, never pip.")
+        conn = connect(store_path(str(self.project)))
+        conn.execute("UPDATE schema_version SET version = 2")
+        conn.commit()
+        before = tuple(conn.iterdump())
+        conn.close()
+
+        result = dispatch("tools/call", {
+            "name": "status", "arguments": {"project": str(self.project)}
+        })
+
+        self.assertTrue(result.get("isError"))
+        self.assertIn("jevmory init", result["content"][0]["text"])
+        conn = connect(store_path(str(self.project)))
+        try:
+            self.assertEqual(tuple(conn.iterdump()), before)
+        finally:
+            conn.close()
+
     def test_status_counts_events_and_facts(self):
         self.seed("We use uv, never pip.", now=T0)
         text = self._call("status", project=str(self.project))

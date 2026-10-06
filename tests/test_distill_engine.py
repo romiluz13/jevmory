@@ -132,6 +132,24 @@ class DistillEngineTest(unittest.TestCase):
 
     # --- privacy gate --------------------------------------------------------
 
+    def test_opposite_policy_is_compared_not_counted_as_support(self):
+        self.add_event("We always use PostgreSQL for production storage.")
+        self.distill(FakeJev())
+        self.add_event("We never use PostgreSQL for production storage.", session="s2")
+        client = FakeJev(mode="scripted", answers={
+            **scripted_phase_a(),
+            **scripted_pair(verdict="new_overrides", confidence=0.9),
+        })
+
+        report = self.distill(client)
+
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(report.duplicates, 0)
+        self.assertEqual(get_fact(self.conn, 1).support_count, 1)
+        self.assertEqual(get_fact(self.conn, 1).status, STATUS_SUPERSEDED)
+        self.assertEqual(report.facts[0].claim,
+                         "We never use PostgreSQL for production storage.")
+
     def test_no_marker_refuses_and_leaves_no_trace(self):
         other = self.home / "locked"  # no opt-in marker for this slug
         other.mkdir()

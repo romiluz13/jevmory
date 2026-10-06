@@ -88,7 +88,7 @@ class AuditEngineTest(unittest.TestCase):
         self.assertEqual(
             report.counts,
             {"KEEP": 3, "STALE": 0, "WRONG": 0, "UNSUPPORTED": 0,
-             "REVIEW": 0, "VERIFIED": 0},
+             "REVIEW": 0, "MATCHED": 0},
         )
         self.assertEqual(report.api_calls, 1)
         self.assertEqual(report.usage_tokens, 360)  # (312+48) per call
@@ -146,6 +146,28 @@ class AuditEngineTest(unittest.TestCase):
 
     # --- stage 1: deterministic anchors (v0.2) ---------------------------
 
+    def test_negated_wrapper_requires_semantic_review(self):
+        claim = "Use npm test for verification of this application."
+        self.add_facts(1, claim=claim)
+        client = FakeJev()
+        report = self.run_engine(
+            client, text="Do not follow the outdated instruction: " + claim
+        )
+        self.assertEqual(client.call_count, 1)
+        self.assertFalse(report.lines[0].anchored)
+
+    def test_matching_memory_does_not_claim_truth_or_refresh_vintage(self):
+        claim = "Use npm test for verification of this application."
+        self.add_facts(1, claim=claim)
+        client = FakeJev()
+        report = self.run_engine(client, text=claim)
+        self.assertEqual(report.lines[0].keyword, "MATCHED")
+        self.assertEqual(client.call_count, 0)
+        self.assertIsNone(self.conn.execute(
+            "SELECT verified_at FROM facts WHERE id = 1"
+        ).fetchone()[0])
+        self.assertIn("current correctness not checked", report.summary_line())
+
     def test_anchored_line_is_verified_with_zero_api_spend(self):
         # two of three lines exist verbatim in the store as facts
         self.add_facts(1, claim="claim one about tooling")
@@ -156,7 +178,7 @@ class AuditEngineTest(unittest.TestCase):
         self.assertEqual(
             report.counts,
             {"KEEP": 1, "STALE": 0, "WRONG": 0, "UNSUPPORTED": 0,
-             "REVIEW": 0, "VERIFIED": 2},
+             "REVIEW": 0, "MATCHED": 2},
         )
         # only the unanchored line went to the model
         self.assertEqual(report.api_calls, 1)
@@ -171,7 +193,7 @@ class AuditEngineTest(unittest.TestCase):
             [v.line.number for v in report.lines], [4, 5, 6]
         )
         keywords = [v.keyword for v in report.lines]
-        self.assertEqual(keywords, ["VERIFIED", "KEEP", "VERIFIED"])
+        self.assertEqual(keywords, ["MATCHED", "KEEP", "MATCHED"])
         anchored = [v for v in report.lines if v.anchored]
         self.assertEqual([v.anchor_fact_id for v in anchored], [1, 2])
         # receipts: the anchored lines never produced judgment rows
@@ -182,16 +204,19 @@ class AuditEngineTest(unittest.TestCase):
         )
         stats = json.loads(self.run_row()[3])
         self.assertEqual(stats["api_calls"], 1)
-        self.assertEqual(stats["lines_verified"], 2)
-        self.assertIn("2 verified verbatim", report.summary_line())
+        self.assertEqual(stats["lines_matched"], 2)
+        self.assertIn("2 matched stored statements", report.summary_line())
 
-    def test_anchor_write_back_stamps_verified_at_vintage(self):
+    def test_anchor_preserves_existing_vintage(self):
         self.add_facts(1, claim="claim one about tooling")
+        previous = "2026-09-01T00:00:00Z"
+        self.conn.execute("UPDATE facts SET verified_at = ? WHERE id = 1", (previous,))
+        self.conn.commit()
         self.run_engine(FakeJev())
         stamped = self.conn.execute(
             "SELECT verified_at FROM facts WHERE id = 1"
         ).fetchone()[0]
-        self.assertEqual(stamped, NOW)  # the run's now, not wall clock
+        self.assertEqual(stamped, previous)
         # facts that were not matched keep NULL (never audited)
         self.add_facts(1, claim="unrelated fact", now="2026-09-19T00:09:00Z")
         self.run_engine(FakeJev())
@@ -211,16 +236,16 @@ class AuditEngineTest(unittest.TestCase):
         self.assertEqual(client.call_count, 0)
         self.assertEqual(len(self.judgments()), 0)
         self.assertIsNotNone(report.run_id)  # provenance row, zero spend
-        self.assertEqual(report.counts["VERIFIED"], 3)
+        self.assertEqual(report.counts["MATCHED"], 3)
         self.assertEqual(report.evidence_facts, 0)  # no evidence sent
-        self.assertIn("3 verified verbatim (no api call)", report.summary_line())
+        self.assertIn("3 matched stored statements (no api call)", report.summary_line())
 
     def test_anchoring_is_project_scoped(self):
         # the same claim in ANOTHER project's store never anchors
         self.add_facts(1, project="other", claim="claim one about tooling")
         client = FakeJev()
         report = self.run_engine(client)
-        self.assertEqual(report.counts["VERIFIED"], 0)
+        self.assertEqual(report.counts["MATCHED"], 0)
         self.assertEqual(report.api_calls, 1)  # stage 2 graded it
 
     def test_retired_facts_never_anchor(self):
@@ -228,7 +253,7 @@ class AuditEngineTest(unittest.TestCase):
         self.conn.execute("UPDATE facts SET status='retired' WHERE id = 1")
         self.conn.commit()
         report = self.run_engine(FakeJev())
-        self.assertEqual(report.counts["VERIFIED"], 0)
+        self.assertEqual(report.counts["MATCHED"], 0)
 
     # --- mode coverage ---------------------------------------------------
 
@@ -286,7 +311,7 @@ class AuditEngineTest(unittest.TestCase):
         self.assertIsNone(report.run_id)
         self.assertEqual(
             report.summary_line(),
-            "all 0 lines hold up — nothing stale, nothing wrong",
+            "no problems found in stored evidence for 0 lines",
         )
         self.assertEqual(client.call_count, 0)
         self.assertEqual(

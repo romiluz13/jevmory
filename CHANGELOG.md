@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+- Restrict automatic deduplication and audit anchors to normalized whole-claim equality. Negations and changed conditions require semantic comparison.
+- Rename the deterministic audit keyword from `VERIFIED` to `MATCHED`; matching stored memory no longer refreshes `verified_at`. Old timestamps display as legacy audit marks, and recalled confidence is labeled durability confidence.
+- Validate returned Choice options and Score levels against the caller's criteria in both the real and fake judgment clients.
+- Open MCP and SessionStart recall connections read-only. Incompatible schemas require an explicit compatible CLI migration; recall never upgrades them. Normal WAL reads still see committed changes.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

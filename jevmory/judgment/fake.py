@@ -99,7 +99,9 @@ class FakeJev:
             }
 
         parsed = {
-            qid: parse_answer(questions[qid].type, raw[qid])
+            qid: parse_answer(
+                questions[qid].type, raw[qid], criteria=questions[qid].criteria
+            )
             for qid in questions
         }
         return JevResponse(answers=parsed, usage=self._usage, model=DEFAULT_MODEL)

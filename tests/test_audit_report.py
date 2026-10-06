@@ -54,13 +54,13 @@ class SummaryLineTest(unittest.TestCase):
     def test_all_keep(self):
         self.assertEqual(
             report([keep(4), keep(5), keep(6)]).summary_line(),
-            "all 3 lines hold up — nothing stale, nothing wrong",
+            "no problems found in stored evidence for 3 lines",
         )
 
     def test_zero_lines(self):
         self.assertEqual(
             report([]).summary_line(),
-            "all 0 lines hold up — nothing stale, nothing wrong",
+            "no problems found in stored evidence for 0 lines",
         )
 
     def test_mixed_counts_in_demo_voice(self):
@@ -122,7 +122,7 @@ class RenderTerminalTest(unittest.TestCase):
     def test_all_keep_no_table(self):
         out = render_terminal(report([keep(4), keep(5)]))
         self.assertNotIn("LINE", out)
-        self.assertIn("all 2 lines hold up", out)
+        self.assertIn("no problems found in stored evidence for 2 lines", out)
         self.assertIn("receipts: run 7", out)
 
     def test_receipts_footer(self):
@@ -189,7 +189,7 @@ class RenderJsonTest(unittest.TestCase):
         self.assertEqual(
             payload["counts"],
             {"KEEP": 1, "STALE": 1, "WRONG": 0, "UNSUPPORTED": 0,
-             REVIEW: 1, "VERIFIED": 0},
+             REVIEW: 1, "MATCHED": 0},
         )
         self.assertEqual(
             [entry["id"] for entry in payload["lines"]],

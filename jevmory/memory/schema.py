@@ -14,10 +14,9 @@ the events table but must not define it (asserted by
 - ``facts_fts`` — FTS5 index over active facts' claims (external content)
 
 v3 (2026-09-21): ``facts.verified_at`` — the vintage marker. Stage 1
-of the two-stage audit (deterministic anchor match) writes back the
-timestamp when a memory line is confirmed verbatim against its stored
-fact; the writer renders said-then vs verified-now from it. NULL means
-"never audited" — the default, never a guess.
+of the original two-stage audit wrote back a timestamp on a memory
+match. Kept for compatibility: it is a legacy audit mark, not proof
+of correctness. Current matching never refreshes this field.
 
 ``schema_version`` is created by the FIRST migration, with an explicit
 branch for v1-era databases ("events table exists, no version row",
@@ -138,7 +137,7 @@ _ALL_DDL: tuple[str, ...] = (
 
 
 class SchemaVersionError(RuntimeError):
-    """The store's schema version is newer than this code supports."""
+    """The store's schema version is incompatible with this operation."""
 
 
 def connect(db_path: str | os.PathLike[str]) -> sqlite3.Connection:
@@ -148,6 +147,28 @@ def connect(db_path: str | os.PathLike[str]) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, timeout=5.0)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
+def connect_readonly(db_path: str | os.PathLike[str]) -> sqlite3.Connection:
+    """Read a current store without creating it or changing schema/data.
+
+    Keep normal SQLite locking so concurrent committed WAL writes remain
+    visible. SQLite may manage its WAL shared-memory sidecars.
+    """
+    uri = Path(db_path).resolve().as_uri() + "?mode=ro"
+    conn = sqlite3.connect(uri, uri=True, timeout=5.0)
+    try:
+        conn.execute("PRAGMA busy_timeout=5000")
+        if current_version(conn) != SCHEMA_VERSION:
+            raise SchemaVersionError(
+                "store schema is incompatible with recall; "
+                "run `jevmory init --project DIR` with a compatible CLI "
+                "to migrate it explicitly"
+            )
+    except Exception:
+        conn.close()
+        raise
     return conn
 
 

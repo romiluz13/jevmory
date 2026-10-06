@@ -130,7 +130,7 @@ class RenderDistillMdTest(unittest.TestCase):
             verified_at="2026-09-17T00:00:00Z",
         )
         md = render_jevmory([verified], now=NOW)
-        self.assertIn("said Sep 1 · verified Sep 17", md)
+        self.assertIn("said Sep 1 · legacy audit mark Sep 17", md)
         self.assertNotIn("unverified", md)
 
     def test_vintage_phrase_falls_back_to_created_at(self):
@@ -193,7 +193,7 @@ class RenderDistillMdTest(unittest.TestCase):
         md = render_jevmory([], asks, now=NOW)
         self.assertIn("## Questions for you", md)
         self.assertIn(
-            '- "we never deploy on fridays" (confidence 0.60) '
+            '- "we never deploy on fridays" (durability confidence 0.60) '
             'vs "always deploy on fridays" — which is current?',
             md,
         )

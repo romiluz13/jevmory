@@ -155,7 +155,7 @@ def _fact_block(
     # Dogfood round 1 (F4): plain calibrated confidence only — the
     # noul-recovery formula was developer math in a user artifact.
     receipt = (
-        f"`{fact.category} · {word}` — confidence **{fact.confidence:.2f}** "
+        f"`{fact.category} · {word}` — durability confidence **{fact.confidence:.2f}** "
         f"· {_seen_phrase(fact, sessions)} · {_vintage_phrase(fact, now_dt)}"
     )
     return [f'- **"{_display(fact.claim)}"**', f"  {receipt}", ""]
@@ -164,7 +164,7 @@ def _fact_block(
 def _ask_line(ask: AskPair) -> str:
     line = (
         f'- "{_display(ask.fact.claim)}" '
-        f"(confidence {ask.fact.confidence:.2f})"
+        f"(durability confidence {ask.fact.confidence:.2f})"
     )
     if ask.partner_claim is not None:
         line += f' vs "{_display(ask.partner_claim)}" — which is current?'
@@ -200,10 +200,9 @@ def _vintage_phrase(fact: Fact, now_dt: datetime | None) -> str:
 
     ``said`` is when the project last supported the claim
     (``last_supported_at`` falling back to ``created_at``). The audit
-    trail reads honestly in both directions: a verified fact carries
-    its check date, an unaudited one says "unverified" out loud —
-    never a guessed date, never silence. The purely visual ``stale``
-    badge still rides the SAID date (no decay, ever).
+    trail renders old verification timestamps as legacy audit marks,
+    never as current checks. New unmatched facts say "unverified".
+    The visual stale badge uses the SAID date; no confidence decay.
     """
     seen = _parse_ts(fact.last_supported_at or fact.created_at)
     text = f"said {seen:%b} {seen.day}"
@@ -211,7 +210,7 @@ def _vintage_phrase(fact: Fact, now_dt: datetime | None) -> str:
         text += " · stale"  # purely visual (PLAN "No decay in v1")
     if fact.verified_at:
         verified = _parse_ts(fact.verified_at)
-        text += f" · verified {verified:%b} {verified.day}"
+        text += f" · legacy audit mark {verified:%b} {verified.day}"
     else:
         text += " · unverified"
     return text

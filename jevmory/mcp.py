@@ -40,7 +40,7 @@ from .memory.facts import (
     get_fact,
     retrieve_similar,
 )
-from .memory.schema import connect, migrate
+from .memory.schema import SchemaVersionError, connect_readonly
 
 # Fallback when the client doesn't name a protocol version (MCP has
 # used date strings since 2025-06-18; echoing the client's ask is the
@@ -75,13 +75,11 @@ def _open_store(project_dir: str):
     path = store_path(project_dir)
     if not path.exists():
         return None
-    conn = connect(path)
-    migrate(conn)  # forward-compat read: old stores upgrade in place
-    return conn
+    return connect_readonly(path)
 
 
 def _vintage(fact) -> str:
-    return f"verified {fact.verified_at[:10]}" if fact.verified_at else "unverified"
+    return f"legacy audit mark {fact.verified_at[:10]}" if fact.verified_at else "unverified"
 
 
 def _claim_line(fact) -> str:
@@ -89,7 +87,7 @@ def _claim_line(fact) -> str:
         fact.claim[: CLAIM_WIDTH - 1].rstrip() + "…"
     )
     return (
-        f"- {claim}  [conf {fact.confidence:.2f} · {fact.category} "
+        f"- {claim}  [durability conf {fact.confidence:.2f} · {fact.category} "
         f"· support {fact.support_count} · said {fact.created_at[:10]} "
         f"· {_vintage(fact)}]"
     )
@@ -198,7 +196,7 @@ def tool_fact(args: dict[str, Any]) -> str:
             f"fact {fact.id}  [{fact.status}]",
             f"  claim:    {fact.claim}",
             f"  category: {fact.category}   significance {fact.significance:.2f}",
-            f"  conf {fact.confidence:.2f} · support {fact.support_count} "
+            f"  durability conf {fact.confidence:.2f} · support {fact.support_count} "
             f"· said {fact.created_at[:10]} · {_vintage(fact)}",
         ]
         if fact.context:
@@ -344,7 +342,7 @@ def dispatch(method: str, params: dict[str, Any]) -> dict[str, Any] | None:
             raise ValueError("arguments must be an object")
         try:
             text = _TOOL_FUNCS[name](arguments)
-        except ValueError as exc:  # bad arguments: tool-level error result
+        except (ValueError, SchemaVersionError) as exc:
             return _result_content(f"error: {exc}", is_error=True)
         return _result_content(text)
     raise LookupError(method)

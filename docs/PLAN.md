@@ -1,5 +1,13 @@
 # jevmory.md — implementation plan (v2, post-review)
 
+Current integrity corrections (2026-10-06) supersede the v2 dedupe and
+audit assumptions below: only normalized whole-claim equality bypasses
+semantic comparison; an audit match is `MATCHED`, not current truth, and
+never refreshes `verified_at`. Returned judgment options/levels must match
+caller criteria. Recall/MCP open the store read-only and require explicit
+CLI migration for incompatible schemas. See CHANGELOG.md and the relevant
+regression tests; the v2 material below is the original design history.
+
 Status: v2 — post-review; all blockers/majors accepted. Method: DDD.
 
 v2 changes from v1 (what GLM must re-read):

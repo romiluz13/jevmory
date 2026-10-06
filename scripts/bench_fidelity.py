@@ -60,7 +60,7 @@ from jevmory.memory.schema import connect, migrate
 PROJECT = "bench-fixture"
 
 # --- planted truth ------------------------------------------------------------
-# Long enough to clear ANCHOR_MIN_CHARS after normalization; realistic
+# Complete statements for normalized whole-claim equality; realistic
 # project-memory claims, not lorem ipsum (the model has to actually
 # read them in --live mode).
 _TRUE_CLAIMS = [
@@ -95,7 +95,7 @@ _EVIDENCE_STATEMENTS = [
 
 # category -> (expected stage-1 route, expected verdict keyword)
 _EXPECTED_KEYWORD = {
-    "verbatim": "VERIFIED",
+    "verbatim": "MATCHED",
     "stale": "STALE",
     "wrong": "WRONG",
     "unsupported": "UNSUPPORTED",
@@ -290,7 +290,7 @@ def _print_human(
         else "full pipeline — ideal scripted model (harness self-check)"
     )
     print(title + ":")
-    keywords = ["VERIFIED", "STALE", "WRONG", "UNSUPPORTED", "KEEP", "REVIEW"]
+    keywords = ["MATCHED", "STALE", "WRONG", "UNSUPPORTED", "KEEP", "REVIEW"]
     header = f"  {'planted':<12}" + "".join(f"{k:>12}" for k in keywords)
     print(header)
     for category in ("verbatim", "stale", "wrong", "unsupported"):
